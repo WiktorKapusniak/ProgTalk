@@ -6,22 +6,31 @@ const routes = [
     redirect: "/login",
   },
   {
+    path: "/register",
+    component: () => import("../views/RegisterView.vue"),
+  },
+  {
     path: "/login",
     component: () => import("../views/LoginView.vue"),
   },
   {
-    path: "/home",
-    component: () => import("../views/HomeView.vue"),
+    path: "/",
+    component: () => import("../layouts/MainLayout.vue"),
     meta: { requiresAuth: true },
-  },
-  {
-    path: "/profile",
-    component: () => import("../views/ProfileView.vue"),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: "/register",
-    component: () => import("../views/RegisterView.vue"),
+    children: [
+      {
+        path: "home",
+        component: () => import("../views/HomeView.vue"),
+      },
+      {
+        path: "profile",
+        component: () => import("../views/ProfileView.vue"),
+      },
+      {
+        path: "settings",
+        component: () => import("../views/SettingsView.vue"),
+      },
+    ],
   },
 ];
 

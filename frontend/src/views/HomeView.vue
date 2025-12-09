@@ -1,6 +1,16 @@
-<script setup lang="ts">
-import Navbar from "@/components/Navbar.vue";
-</script>
+<script setup lang="ts"></script>
 <template>
-  <Navbar />
+  <div class="home">
+    <h1>Home Page</h1>
+  </div>
 </template>
+
+<style scoped lang="scss">
+.home {
+  padding: $padding-lg;
+}
+
+h1 {
+  color: $secondary-color;
+}
+</style>

@@ -18,6 +18,7 @@ const handleSubmit = async () => {
     });
 
     localStorage.setItem("token", response.data.token);
+    localStorage.setItem("userId", response.data.userId);
     toast.success("Login successful!");
     router.push("/home");
   } catch (err) {
@@ -104,6 +105,14 @@ h2 {
   background-color: $background-dark;
   border-radius: $border-radius;
   color: $text-white;
+  // Wymuszenie koloru tła dla autofill
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus,
+  &:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px $background-dark inset !important;
+    -webkit-text-fill-color: $text-white !important;
+  }
 }
 #submitButton {
   width: 100%;

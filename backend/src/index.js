@@ -21,12 +21,13 @@ app.use(passport.initialize());
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
 const adminRoutes = require("./routes/admin");
+const topicsRoutes = require("./routes/topics");
 
 // Use routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
-
+app.use("/api/topics", topicsRoutes);
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)

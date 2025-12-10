@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 const { isLoggedIn, isAdmin } = require("../middleware/auth");
 
-router.post("/ban/:id", isLoggedIn, isAdmin, async (req, res) => {
+router.post("/ban/:id", isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
@@ -19,7 +19,7 @@ router.post("/ban/:id", isLoggedIn, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/unban/:id", isLoggedIn, async (req, res) => {
+router.post("/unban/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);

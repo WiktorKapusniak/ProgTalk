@@ -2,9 +2,9 @@ const User = require("../models/User");
 const express = require("express");
 const router = express.Router();
 const Topic = require("../models/Topic");
-const { isAdmin, isLoggedIn, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
+const { isAdmin, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
 // POST /api/topics
-router.post("/", isLoggedIn, async (req, res) => {
+router.post("/", async (req, res) => {
   const { title, description } = req.body;
   try {
     const mainMod = await User.findById(req.user._id);
@@ -23,7 +23,7 @@ router.post("/", isLoggedIn, async (req, res) => {
 });
 
 // GET /api/topics?page=1&limit=20&parentId=null
-router.get("/", isLoggedIn, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { page = 1, limit = 50, parentId } = req.query;
     const skip = (page - 1) * limit;
@@ -58,7 +58,7 @@ router.get("/", isLoggedIn, async (req, res) => {
 });
 
 // GET /api/topics/:id/subtopics
-router.get("/:id/subtopics", isLoggedIn, async (req, res) => {
+router.get("/:id/subtopics", async (req, res) => {
   try {
     const { id } = req.params;
     const subtopics = await Topic.find({ parentTopic: id, isHidden: false })
@@ -72,7 +72,7 @@ router.get("/:id/subtopics", isLoggedIn, async (req, res) => {
 });
 
 // GET /api/topics/:id
-router.get("/:id", isLoggedIn, async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const topic = await Topic.findById(id).populate("mainModerator", "username").populate("moderators", "username");
@@ -87,7 +87,7 @@ router.get("/:id", isLoggedIn, async (req, res) => {
 });
 
 // PATCH /api/topics/:id
-router.patch("/:id", isLoggedIn, loadTopic, isModerator, async (req, res) => {
+router.patch("/:id", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
     const { title, description } = req.body;
@@ -104,7 +104,7 @@ router.patch("/:id", isLoggedIn, loadTopic, isModerator, async (req, res) => {
 });
 
 // POST /api/topics/:id/subtopics
-router.post("/:id/subtopics", isLoggedIn, loadTopic, isModerator, async (req, res) => {
+router.post("/:id/subtopics", loadTopic, isModerator, async (req, res) => {
   try {
     const parentTopic = req.topic;
     const { title, description } = req.body;
@@ -129,7 +129,7 @@ router.post("/:id/subtopics", isLoggedIn, loadTopic, isModerator, async (req, re
 });
 
 // POST /api/topics/:id/moderators
-router.post("/:id/moderators", isLoggedIn, loadTopic, isModerator, async (req, res) => {
+router.post("/:id/moderators", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
     const { moderatorId } = req.body;
@@ -151,7 +151,7 @@ router.post("/:id/moderators", isLoggedIn, loadTopic, isModerator, async (req, r
   }
 });
 // DELETE /api/topics/:id/moderators/:moderatorId
-router.delete("/:id/moderators/:moderatorId", isLoggedIn, loadTopic, isModerator, async (req, res) => {
+router.delete("/:id/moderators/:moderatorId", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
     const { moderatorId } = req.params;
@@ -172,7 +172,7 @@ router.delete("/:id/moderators/:moderatorId", isLoggedIn, loadTopic, isModerator
 });
 
 // POST /api/topics/:id/block-user
-router.post("/:id/block-user", isLoggedIn, loadTopic, isModerator, async (req, res) => {
+router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
     const { userId, allowedSubtopics = [] } = req.body;
@@ -201,7 +201,7 @@ router.post("/:id/block-user", isLoggedIn, loadTopic, isModerator, async (req, r
 });
 
 // POST /api/topics/:id/unblock-user
-router.post("/:id/unblock-user", isLoggedIn, loadTopic, isModerator, async (req, res) => {
+router.post("/:id/unblock-user", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
     const { userId } = req.body;
@@ -217,7 +217,7 @@ router.post("/:id/unblock-user", isLoggedIn, loadTopic, isModerator, async (req,
 });
 
 // POST /api/topics/:id/close
-router.post("/:id/close", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
+router.post("/:id/close", loadTopic, isAdmin, async (req, res) => {
   try {
     const topic = req.topic;
     if (topic.isClosed) {
@@ -232,7 +232,7 @@ router.post("/:id/close", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
   }
 });
 // POST /api/topics/:id/open
-router.post("/:id/open", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
+router.post("/:id/open", loadTopic, isAdmin, async (req, res) => {
   try {
     const topic = req.topic;
     if (!topic.isClosed) {
@@ -248,7 +248,7 @@ router.post("/:id/open", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
 });
 
 //POST /api/topics/:id/hide
-router.post("/:id/hide", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
+router.post("/:id/hide", loadTopic, isAdmin, async (req, res) => {
   try {
     const topic = req.topic;
     if (topic.isHidden) {
@@ -264,7 +264,7 @@ router.post("/:id/hide", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
 });
 
 //POST /api/topics/:id/unhide
-router.post("/:id/unhide", isLoggedIn, loadTopic, isAdmin, async (req, res) => {
+router.post("/:id/unhide", loadTopic, isAdmin, async (req, res) => {
   try {
     const topic = req.topic;
     if (!topic.isHidden) {

@@ -22,12 +22,15 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
 const adminRoutes = require("./routes/admin");
 const topicsRoutes = require("./routes/topics");
+const { isLoggedIn } = require("./middleware/auth");
+const postRoutes = require("./routes/posts");
 
 // Use routes
 app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/topics", topicsRoutes);
+app.use("/api/users", isLoggedIn, userRoutes);
+app.use("/api/admin", isLoggedIn, adminRoutes);
+app.use("/api/topics", isLoggedIn, topicsRoutes);
+app.use("/api/", isLoggedIn, postRoutes);
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)

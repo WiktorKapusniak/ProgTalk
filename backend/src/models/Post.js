@@ -12,11 +12,5 @@ const postSchema = new Schema({
   deleted: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
-postSchema.virtual("likeCount").get(function () {
-  return this.likes.length;
-});
-
-postSchema.set("toJSON", { virtuals: true });
-postSchema.set("toObject", { virtuals: true });
 
 module.exports = model("Post", postSchema);

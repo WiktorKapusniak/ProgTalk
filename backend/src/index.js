@@ -3,11 +3,15 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const passport = require("passport");
-const path = require("path");
 
+const http = require("http");
+const { initializeSocket } = require("./socket");
 //set app
 const app = express();
 const PORT = process.env.PORT || 5000;
+// http server
+const server = http.createServer(app);
+const io = initializeSocket(server);
 
 //config
 require("./config/passport")(passport);
@@ -16,6 +20,9 @@ require("./config/passport")(passport);
 app.use(cors());
 app.use(express.json());
 app.use(passport.initialize());
+
+// Socket.io initialization
+app.set("io", io);
 
 // Routes
 const authRoutes = require("./routes/auth");
@@ -31,6 +38,7 @@ app.use("/api/users", isLoggedIn, userRoutes);
 app.use("/api/admin", isLoggedIn, adminRoutes);
 app.use("/api/topics", isLoggedIn, topicsRoutes);
 app.use("/api/", isLoggedIn, postRoutes);
+
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)
@@ -41,7 +49,8 @@ mongoose
 app.get("/", (req, res) => {
   res.send("Welcome to ProgTalk Backend!");
 });
+
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

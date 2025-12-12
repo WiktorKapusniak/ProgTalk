@@ -55,6 +55,13 @@ router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (r
       topic: parentTopic._id,
     });
     await newPost.save();
+    const io = req.app.get("io");
+
+    const populatedPost = await Post.findById(newPost._id).populate("author", "username"); // musimy populate autora zeby miec dostep do username bo bazowo jest tylko jego id
+    io.to(`topic-${parentTopic._id}`).emit("new-post", {
+      post: populatedPost,
+    });
+
     res.status(201).json({ message: "Post created successfully", post: newPost });
   } catch (err) {
     console.error("POST /:topicId/posts error:", err);
@@ -75,6 +82,10 @@ router.delete("/posts/:postId", async (req, res) => {
     }
     post.deleted = true;
     await post.save();
+
+    const io = req.app.get("io");
+    io.to(`topic-${post.topic}`).emit("post-deleted", { postId: post._id });
+
     res.json({ message: "Post deleted successfully" });
   } catch (err) {
     console.error("DELETE /posts/:postId error:", err);
@@ -95,6 +106,10 @@ router.post("/posts/:id/like", async (req, res) => {
     }
     post.likes.push(req.user._id);
     await post.save();
+
+    const io = req.app.get("io");
+    io.to(`topic-${post.topic}`).emit("post-liked", { postId: post._id, likes: post.likes });
+
     res.json({ message: "Post liked successfully" });
   } catch (err) {
     console.error("POST /posts/:id/like error:", err);
@@ -116,10 +131,13 @@ router.delete("/posts/:id/like", async (req, res) => {
     }
     post.likes.splice(likeIndex, 1);
     await post.save();
+    const io = req.app.get("io");
+    io.to(`topic-${post.topic}`).emit("post-unliked", { postId: post._id, likes: post.likes });
     res.json({ message: "Post unliked successfully" });
   } catch (err) {
     console.error("DELETE /posts/:id/like error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 module.exports = router;

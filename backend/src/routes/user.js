@@ -1,8 +1,8 @@
 const User = require("../models/User");
 const express = require("express");
 const router = express.Router();
-const { isLoggedIn } = require("../middleware/auth");
 const { hashPassword } = require("../utils/auth");
+
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;

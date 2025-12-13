@@ -25,7 +25,7 @@ router.post("/", async (req, res) => {
 // GET /api/topics?page=1&limit=20&parentId=null
 router.get("/", async (req, res) => {
   try {
-    const { page = 1, limit = 50, parentId } = req.query;
+    const { page = 1, limit = 10, parentId } = req.query;
     const skip = (page - 1) * limit;
 
     const query = { isHidden: false };

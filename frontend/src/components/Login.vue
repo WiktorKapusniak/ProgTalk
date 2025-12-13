@@ -19,6 +19,12 @@ const handleSubmit = async () => {
 
     localStorage.setItem("token", response.data.token);
     localStorage.setItem("userId", response.data.userId);
+    if (!localStorage.getItem("topicsPerPage")) {
+      localStorage.setItem("topicsPerPage", "10");
+    }
+    if (!localStorage.getItem("currentPage")) {
+      localStorage.setItem("currentPage", "1");
+    }
     toast.success("Login successful!");
     router.push("/home");
   } catch (err) {

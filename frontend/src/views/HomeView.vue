@@ -1,16 +1,8 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import Home from "@/components/Home.vue";
+</script>
 <template>
-  <div class="home">
-    <h1>Home Page</h1>
-  </div>
+  <Home />
 </template>
 
-<style scoped lang="scss">
-.home {
-  padding: $padding-lg;
-}
-
-h1 {
-  color: $secondary-color;
-}
-</style>
+<style scoped lang="scss"></style>

@@ -30,6 +30,10 @@ const routes = [
         path: "settings",
         component: () => import("../views/SettingsView.vue"),
       },
+      {
+        path: "topic/:id",
+        component: () => import("../views/TopicView.vue"),
+      },
     ],
   },
 ];

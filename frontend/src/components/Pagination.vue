@@ -40,7 +40,7 @@ const changeLimit = (event: Event) => {
     </div>
 
     <div class="pagination-info">
-      <span>Results {{ (page - 1) * limit + 1 }} - {{ page + limit - 1 }} of {{ total }}</span>
+      <span>Results {{ (page - 1) * limit + 1 }} - {{ Math.min(page * limit, total) }} of {{ total }}</span>
     </div>
   </div>
 </template>

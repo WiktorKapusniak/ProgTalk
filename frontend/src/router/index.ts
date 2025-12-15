@@ -38,6 +38,14 @@ const routes = [
         path: "create-topic",
         component: () => import("../views/CreateTopicView.vue"),
       },
+      {
+        path: "topic/:id/create-subtopic",
+        component: () => import("../views/CreateSubtopicView.vue"),
+      },
+      {
+        path: "topic/:id/create-post",
+        component: () => import("../views/CreatePostView.vue"),
+      },
     ],
   },
 ];

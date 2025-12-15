@@ -28,8 +28,13 @@ function isAdmin(req, res, next) {
 
 async function loadTopic(req, res, next) {
   try {
-    const { id } = req.params;
-    const topic = await Topic.findById(id);
+    const topicId = req.params.id || req.params.topicId;
+
+    if (!topicId) {
+      return res.status(400).json({ message: "Topic ID is required" });
+    }
+
+    const topic = await Topic.findById(topicId);
 
     if (!topic) {
       return res.status(404).json({ message: "Topic not found" });

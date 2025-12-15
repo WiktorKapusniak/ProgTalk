@@ -2,47 +2,58 @@
 import { onMounted, reactive } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
+
 const toast = useToast();
 const router = useRouter();
-interface TopicForm {
+const route = useRoute();
+
+interface SubtopicForm {
   topic: string;
   description: string;
 }
-const form: TopicForm = reactive({
+
+const form: SubtopicForm = reactive({
   topic: "",
   description: "",
 });
+
 onMounted(async () => {});
-const handleAddTopic = async () => {
-  const response = await axios.post("/api/topics", {
-    title: form.topic,
-    description: form.description,
-  });
-  if (response.status === 201) {
-    toast.success("Topic added successfully!");
-    form.topic = "";
-    form.description = "";
-    router.push("/home");
-  } else {
-    toast.error("Failed to add topic. Please try again.");
+
+const handleAddSubtopic = async () => {
+  try {
+    const parentId = route.params.id as string;
+
+    const response = await axios.post(`/api/topics/${parentId}/subtopics`, {
+      title: form.topic,
+      description: form.description,
+    });
+
+    if (response.status === 201) {
+      toast.success("Podtemat dodany pomyślnie!");
+      form.topic = "";
+      form.description = "";
+      router.push(`/topic/${parentId}`);
+    }
+  } catch (error) {
+    toast.error("Nie udało się dodać podtematu. Spróbuj ponownie.");
   }
 };
 </script>
 <template>
   <section class="addTopicSection">
     <div class="addTopicContainer">
-      <h2>Add Topic</h2>
-      <form @submit.prevent="handleAddTopic">
+      <h2>Dodaj Podtemat</h2>
+      <form @submit.prevent="handleAddSubtopic">
         <div class="input">
-          <label for="topic">Topic</label>
+          <label for="topic">Tytuł</label>
           <textarea id="topic" v-model="form.topic" rows="2" required></textarea>
         </div>
         <div class="input">
-          <label for="description">Description</label>
+          <label for="description">Opis</label>
           <textarea id="description" v-model="form.description" rows="4" required></textarea>
         </div>
-        <button type="submit" id="submitButton">Add</button>
+        <button type="submit" id="submitButton">Dodaj Podtemat</button>
       </form>
     </div>
   </section>

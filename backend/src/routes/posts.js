@@ -57,7 +57,7 @@ router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (r
     await newPost.save();
     const io = req.app.get("io");
 
-    const populatedPost = await Post.findById(newPost._id).populate("author", "username"); // musimy populate autora zeby miec dostep do username bo bazowo jest tylko jego id
+    const populatedPost = await Post.findById(newPost._id).populate("author", "username");
     io.to(`topic-${parentTopic._id}`).emit("new-post", {
       post: populatedPost,
     });

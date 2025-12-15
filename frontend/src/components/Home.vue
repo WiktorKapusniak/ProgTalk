@@ -109,7 +109,11 @@ onMounted(async () => {
       <ul v-else class="topic-list">
         <li v-for="topic in topics" :key="topic._id" class="topic-item">
           <RouterLink :to="`/topic/${topic._id}`" class="topic-link">
-            <i v-if="username === topic.mainModerator.username" class="pi pi-trash delete-icon" @click.prevent="deleteTopic(topic._id)"></i>
+            <i
+              v-if="username === topic.mainModerator.username"
+              class="pi pi-trash delete-icon"
+              @click.prevent="deleteTopic(topic._id)"
+            ></i>
             <div class="topic-header">
               <h2 class="topic-title">{{ topic.title }}</h2>
             </div>
@@ -120,7 +124,14 @@ onMounted(async () => {
           </RouterLink>
         </li>
       </ul>
-      <Pagination :page="pagination.page" :limit="pagination.limit" :total="pagination.total" :totalPages="pagination.totalPages" @page-changed="handlePageChange" @limit-changed="handleLimitChange" />
+      <Pagination
+        :page="pagination.page"
+        :limit="pagination.limit"
+        :total="pagination.total"
+        :totalPages="pagination.totalPages"
+        @page-changed="handlePageChange"
+        @limit-changed="handleLimitChange"
+      />
     </div>
   </section>
 </template>

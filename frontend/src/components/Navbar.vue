@@ -35,6 +35,7 @@ const handleLogout = () => {
   align-items: center;
   background-color: $background-lighter;
   padding: $padding-md $padding-lg;
+  // padding-bottom: 0;
   box-shadow: $box-shadow;
 }
 

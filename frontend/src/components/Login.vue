@@ -111,7 +111,7 @@ h2 {
   background-color: $background-dark;
   border-radius: $border-radius;
   color: $text-white;
-  // Wymuszenie koloru tła dla autofill
+  // Wymuszenie koloru tła dla autofilla przegladarkowego
   &:-webkit-autofill,
   &:-webkit-autofill:hover,
   &:-webkit-autofill:focus,

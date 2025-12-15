@@ -11,4 +11,6 @@ export default interface Topic {
     username: string;
   }>;
   isHidden: boolean;
+  createdAt: Date;
+  isClosed: boolean;
 }

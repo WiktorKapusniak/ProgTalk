@@ -33,12 +33,7 @@ router.get("/", async (req, res) => {
       query.parentTopic = parentId === "null" ? null : parentId;
     }
 
-    const topics = await Topic.find(query)
-      .populate("mainModerator", "username")
-      .populate("moderators", "username")
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+    const topics = await Topic.find(query).populate("mainModerator", "username").populate("moderators", "username").skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
 
     const total = await Topic.countDocuments(query);
 
@@ -61,9 +56,7 @@ router.get("/", async (req, res) => {
 router.get("/:id/subtopics", async (req, res) => {
   try {
     const { id } = req.params;
-    const subtopics = await Topic.find({ parentTopic: id, isHidden: false })
-      .populate("mainModerator", "username")
-      .populate("moderators", "username");
+    const subtopics = await Topic.find({ parentTopic: id, isHidden: false }).populate("mainModerator", "username").populate("moderators", "username");
     res.json(subtopics);
   } catch (err) {
     console.error("GET /:id/subtopics error:", err);

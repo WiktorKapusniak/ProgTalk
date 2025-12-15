@@ -34,6 +34,10 @@ const routes = [
         path: "topic/:id",
         component: () => import("../views/TopicView.vue"),
       },
+      {
+        path: "create-topic",
+        component: () => import("../views/CreateTopicView.vue"),
+      },
     ],
   },
 ];

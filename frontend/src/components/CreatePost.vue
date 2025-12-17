@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, reactive } from "vue";
+import { onMounted, reactive, ref } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRouter, useRoute } from "vue-router";
@@ -8,35 +8,50 @@ const toast = useToast();
 const router = useRouter();
 const route = useRoute();
 
-interface SubtopicForm {
-  topic: string;
-  description: string;
+interface PostForm {
+  content: string;
+  code?: string;
+  tags?: string[];
+  references?: string[];
 }
 
-const form: SubtopicForm = reactive({
-  topic: "",
-  description: "",
+const form: PostForm = reactive({
+  content: "",
+  code: "",
+  tags: [],
+  references: [],
+});
+const tags = ref<string[]>([]);
+
+onMounted(async () => {
+  const response = await axios.get("/api/tags");
+  tags.value = response.data.tags;
+  if (response.status !== 200) {
+    toast.error("Failed to load tags.");
+  }
 });
 
-onMounted(async () => {});
-
-const handleAddSubtopic = async () => {
+const handleAddPost = async () => {
   try {
     const parentId = route.params.id as string;
+    const refId = route.query.ref as string | undefined;
 
-    const response = await axios.post(`/api/topics/${parentId}/subtopics`, {
-      title: form.topic,
-      description: form.description,
+    const response = await axios.post(`/api/topics/${parentId}/posts`, {
+      content: form.content,
+      code: form.code,
+      tags: form.tags,
+      references: refId ? [refId] : [],
     });
 
     if (response.status === 201) {
-      toast.success("Podtemat dodany pomyślnie!");
-      form.topic = "";
-      form.description = "";
+      toast.success("Post dodany pomyślnie!");
+      form.content = "";
+      form.code = "";
+      form.tags = [];
       router.push(`/topic/${parentId}`);
     }
   } catch (error) {
-    toast.error("Nie udało się dodać podtematu. Spróbuj ponownie.");
+    toast.error("Failed to add post. Please try again.");
   }
 };
 </script>
@@ -44,16 +59,24 @@ const handleAddSubtopic = async () => {
   <section class="addTopicSection">
     <div class="addTopicContainer">
       <h2>Dodaj Post</h2>
-      <form @submit.prevent="handleAddSubtopic">
+      <form @submit.prevent="handleAddPost">
         <div class="input">
-          <label for="topic">Tytuł</label>
-          <textarea id="topic" v-model="form.topic" rows="2" required></textarea>
+          <label for="content">Content</label>
+          <textarea id="content" v-model="form.content" rows="3" required></textarea>
         </div>
         <div class="input">
-          <label for="description">Opis</label>
-          <textarea id="description" v-model="form.description" rows="4" required></textarea>
+          <label for="code">Code (optional)</label>
+          <textarea id="code" v-model="form.code" rows="4"></textarea>
         </div>
-        <button type="submit" id="submitButton">Dodaj Podtemat</button>
+        <div class="input">
+          <label for="tags">Tags</label>
+          <div class="tags-container">
+            <select id="tags" v-model="form.tags" multiple>
+              <option v-for="tag in tags" :key="tag" :value="tag">{{ tag }}</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" id="submitButton">Dodaj Post</button>
       </form>
     </div>
   </section>

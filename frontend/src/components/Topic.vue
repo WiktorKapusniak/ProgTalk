@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, computed } from "vue";
+import { onMounted, ref, computed, watch, nextTick } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRoute, RouterLink } from "vue-router";
@@ -7,10 +7,12 @@ import type Topic from "@/interfaces/Topic";
 import type Post from "@/interfaces/Post";
 import { useAuth } from "@/composables/useAuth";
 import "primeicons/primeicons.css";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
 
 const toast = useToast();
 const route = useRoute();
-const { username, loadUsername } = useAuth();
+const { username, userId, loadUsername } = useAuth();
 
 const currentTopic = ref<Topic>({} as Topic);
 const subTopics = ref<Topic[]>([]);
@@ -24,10 +26,52 @@ const isModerator = computed(() => {
 
   return isMainMod || isPromotedMod;
 });
-const deleteTopic = async (topicId: string) => {};
-onMounted(async () => {
+const isLiked = (post: Post) => {
+  return post.likes.includes(userId.value || "");
+};
+
+const handleLikePost = async (post: Post) => {
+  if (!userId.value) return;
+
+  const currentlyLiked = isLiked(post);
+
+  if (currentlyLiked) {
+    const index = post.likes.indexOf(userId.value);
+    if (index > -1) post.likes.splice(index, 1);
+  } else {
+    post.likes.push(userId.value);
+  }
+
   try {
-    await loadUsername();
+    if (currentlyLiked) {
+      await axios.delete(`/api/posts/${post._id}/like`);
+    } else {
+      await axios.post(`/api/posts/${post._id}/like`);
+    }
+  } catch (error) {
+    // Rollback przy błędzie
+    if (currentlyLiked) {
+      post.likes.push(userId.value);
+    } else {
+      const index = post.likes.indexOf(userId.value);
+      if (index > -1) post.likes.splice(index, 1);
+    }
+    toast.error("Failed to update like");
+  }
+};
+
+const deleteTopic = async (topicId: string) => {};
+
+const highlightCode = () => {
+  nextTick(() => {
+    document.querySelectorAll("pre code").forEach((block) => {
+      hljs.highlightElement(block as HTMLElement);
+    });
+  });
+};
+
+const fetchTopicData = async () => {
+  try {
     const topicId = route.params.id;
 
     const topicResponse = await axios.get(`/api/topics/${topicId}`);
@@ -38,10 +82,34 @@ onMounted(async () => {
 
     const postsResponse = await axios.get(`/api/topics/${topicId}/posts`);
     posts.value = postsResponse.data.posts;
+
+    highlightCode();
   } catch (error) {
     toast.error("Failed to load topic data.");
   }
+};
+
+onMounted(async () => {
+  await loadUsername();
+  await fetchTopicData();
 });
+
+watch(
+  () => route.params.id,
+  async (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      await fetchTopicData();
+    }
+  }
+);
+
+watch(
+  posts,
+  () => {
+    highlightCode();
+  },
+  { deep: true }
+);
 </script>
 
 <template>
@@ -112,7 +180,10 @@ onMounted(async () => {
           <div class="post-content">{{ post.content }}</div>
           <pre v-if="post.code" class="post-code"><code>{{ post.code }}</code></pre>
           <div class="post-footer">
-            <button class="like-button">❤️ {{ post.likes.length }}</button>
+            <button @click.prevent="handleLikePost(post)" class="like-button">
+              <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+              {{ post.likes.length }}
+            </button>
           </div>
         </li>
       </ul>
@@ -346,6 +417,7 @@ onMounted(async () => {
 
   .post-footer {
     display: flex;
+    justify-content: flex-end;
     gap: $margin-md;
 
     .like-button {
@@ -353,6 +425,7 @@ onMounted(async () => {
       border: 1px solid $border-dark;
       color: $text-light;
       padding: $padding-sm $padding-md;
+
       border-radius: $border-radius;
       cursor: pointer;
       transition: all 0.2s;

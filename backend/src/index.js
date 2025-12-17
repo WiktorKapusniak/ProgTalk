@@ -31,6 +31,7 @@ const adminRoutes = require("./routes/admin");
 const topicsRoutes = require("./routes/topics");
 const { isLoggedIn } = require("./middleware/auth");
 const postRoutes = require("./routes/posts");
+const tagRoutes = require("./routes/tags");
 
 // Use routes
 app.use("/api/auth", authRoutes);
@@ -38,6 +39,7 @@ app.use("/api/users", isLoggedIn, userRoutes);
 app.use("/api/admin", isLoggedIn, adminRoutes);
 app.use("/api/topics", isLoggedIn, topicsRoutes);
 app.use("/api/", isLoggedIn, postRoutes);
+app.use("/api/tags", isLoggedIn, tagRoutes);
 
 // MongoDB connection
 mongoose

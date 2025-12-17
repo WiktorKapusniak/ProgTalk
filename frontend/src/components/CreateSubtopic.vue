@@ -36,7 +36,7 @@ const handleAddSubtopic = async () => {
       router.push(`/topic/${parentId}`);
     }
   } catch (error) {
-    toast.error("Nie udało się dodać podtematu. Spróbuj ponownie.");
+    toast.error("Failed to add subtopic. Please try again.");
   }
 };
 </script>

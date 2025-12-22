@@ -26,6 +26,16 @@ function isAdmin(req, res, next) {
   });
 }
 
+function isApproved(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  if (!req.user.approved) {
+    return res.status(403).json({ message: "Forbidden: Account not approved yet. Please wait for admin approval." });
+  }
+  next();
+}
+
 async function loadTopic(req, res, next) {
   try {
     const topicId = req.params.id || req.params.topicId;
@@ -50,10 +60,7 @@ async function loadTopic(req, res, next) {
 function isModerator(req, res, next) {
   const topic = req.topic;
 
-  const isTopicModerator =
-    topic.mainModerator.toString() === req.user._id.toString() ||
-    topic.moderators.some((mod) => mod.toString() === req.user._id.toString()) ||
-    req.user.role === "admin";
+  const isTopicModerator = topic.mainModerator.toString() === req.user._id.toString() || topic.moderators.some((mod) => mod.toString() === req.user._id.toString()) || req.user.role === "admin";
 
   if (!isTopicModerator) {
     return res.status(403).json({ message: "You are not a moderator of this topic" });
@@ -102,6 +109,7 @@ module.exports = {
   isLoggedIn,
   isAdmin,
   loadTopic,
+  isApproved,
   isModerator,
   checkIfBlockedInTopic,
 };

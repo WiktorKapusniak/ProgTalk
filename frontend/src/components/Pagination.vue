@@ -25,7 +25,7 @@ const changeLimit = (event: Event) => {
     <div class="buttons-and-limit">
       <div class="page-buttons">
         <button @click="goToPage(page - 1)" :disabled="page === 1"><</button>
-        <button @click="goToPage(1)">1</button>
+        <button>{{ page }}</button>
         <button @click="goToPage(page + 1)" :disabled="page >= totalPages">></button>
       </div>
       <div class="limit-selector">

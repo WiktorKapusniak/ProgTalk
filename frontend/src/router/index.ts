@@ -1,3 +1,4 @@
+import { connectSocket } from "@/composables/socket";
 import { createRouter, createWebHistory } from "vue-router";
 
 const routes = [
@@ -26,10 +27,7 @@ const routes = [
         path: "profile",
         component: () => import("../views/ProfileView.vue"),
       },
-      {
-        path: "settings",
-        component: () => import("../views/SettingsView.vue"),
-      },
+
       {
         path: "topic/:id",
         component: () => import("../views/TopicView.vue"),
@@ -46,6 +44,14 @@ const routes = [
         path: "topic/:id/create-post",
         component: () => import("../views/CreatePostView.vue"),
       },
+      {
+        path: "adminpanel",
+        component: () => import("../views/AdminPanelView.vue"),
+      },
+      {
+        path: "not-approved",
+        component: () => import("../views/NotApprovedView.vue"),
+      },
     ],
   },
 ];
@@ -55,14 +61,51 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem("token");
+
   if (to.meta.requiresAuth && !token) {
     return next("/login");
   }
-  if ((to.path === "/login" || to.path === "/register") && token) {
-    return next("/home");
+
+  if (token) {
+    try {
+      const userId = localStorage.getItem("userId");
+      if (userId) {
+        const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          connectSocket();
+          const userData = await response.json();
+          const isApproved = userData.approved;
+          const isAdmin = userData.role === "admin";
+
+          if (to.path === "/login" || to.path === "/register") {
+            if (isApproved || isAdmin) {
+              return next("/home");
+            } else {
+              return next("/not-approved");
+            }
+          }
+
+          if (to.meta.requiresAuth && !isApproved && !isAdmin && to.path !== "/not-approved") {
+            return next("/not-approved");
+          }
+
+          if ((isApproved || isAdmin) && to.path === "/not-approved") {
+            return next("/home");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking approval status:", error);
+    }
   }
+
   next();
 });
 export default router;

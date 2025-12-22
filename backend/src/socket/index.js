@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const { registerTopicHandlers } = require("./handlers/topics");
+const { registerSubtopicHandlers } = require("./handlers/subtopic");
 const { registerAdminHandlers } = require("./handlers/admin");
 const { socketAuthMiddleware } = require("./middleware/auth");
 function initializeSocket(server) {
@@ -16,7 +17,7 @@ function initializeSocket(server) {
     console.log(`User connected: ${socket.user.username} (${socket.id})`);
 
     registerTopicHandlers(io, socket);
-    registerPostHandlers(io, socket);
+    registerSubtopicHandlers(socket, io);
     registerAdminHandlers(io, socket);
 
     socket.on("disconnect", () => {

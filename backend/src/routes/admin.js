@@ -3,14 +3,14 @@ const express = require("express");
 const router = express.Router();
 const { isLoggedIn, isAdmin } = require("../middleware/auth");
 
-router.post("/ban/:id", isAdmin, async (req, res) => {
+router.post("/ban/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    user.Banned = true;
+    user.banned = true;
     await user.save();
     res.json({ message: "User banned successfully" });
   } catch (err) {
@@ -26,7 +26,7 @@ router.post("/unban/:id", async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    user.Banned = false;
+    user.banned = false;
     await user.save();
     res.json({ message: "User unbanned successfully" });
   } catch (err) {

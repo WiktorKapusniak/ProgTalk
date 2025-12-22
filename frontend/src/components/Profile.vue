@@ -155,7 +155,7 @@ input {
     border-color: $primary-color;
   }
 
-  // Wymuszenie koloru tła dla autofill
+  // Wymuszenie koloru tła dla autofilli
   &:-webkit-autofill,
   &:-webkit-autofill:hover,
   &:-webkit-autofill:focus,

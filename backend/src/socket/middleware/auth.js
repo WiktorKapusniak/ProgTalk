@@ -13,7 +13,7 @@ async function socketAuthMiddleware(socket, next) {
     if (!user) {
       return next(new Error("Authentication error: User not found"));
     }
-    if (user.Banned) {
+    if (user.banned) {
       return next(new Error("Authentication error: User is banned"));
     }
     socket.user = user;

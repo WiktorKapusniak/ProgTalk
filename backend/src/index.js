@@ -29,18 +29,19 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
 const adminRoutes = require("./routes/admin");
 const topicsRoutes = require("./routes/topics");
-const { isLoggedIn } = require("./middleware/auth");
+const { isLoggedIn, isAdmin, isApproved } = require("./middleware/auth");
 const postRoutes = require("./routes/posts");
 const tagRoutes = require("./routes/tags");
+const adminPanelRoutes = require("./routes/adminPanel");
 
 // Use routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", isLoggedIn, userRoutes);
-app.use("/api/admin", isLoggedIn, adminRoutes);
-app.use("/api/topics", isLoggedIn, topicsRoutes);
-app.use("/api/", isLoggedIn, postRoutes);
-app.use("/api/tags", isLoggedIn, tagRoutes);
-
+app.use("/api/admin", isLoggedIn, isAdmin, adminRoutes);
+app.use("/api/topics", isLoggedIn, isApproved, topicsRoutes);
+app.use("/api/", isLoggedIn, isApproved, postRoutes);
+app.use("/api/tags", isLoggedIn, isApproved, tagRoutes);
+app.use("/api/admin-panel", isLoggedIn, isAdmin, adminPanelRoutes);
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)

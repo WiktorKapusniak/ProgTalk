@@ -2,8 +2,9 @@
 import { RouterLink, useRouter } from "vue-router";
 import { onMounted } from "vue";
 import { useAuth } from "../composables/useAuth";
+import { disconnectSocket } from "@/composables/socket";
 
-const { username, loadUsername } = useAuth();
+const { username, isAdmin, loadUsername } = useAuth();
 const router = useRouter();
 
 onMounted(async () => {
@@ -11,6 +12,7 @@ onMounted(async () => {
 });
 
 const handleLogout = () => {
+  disconnectSocket();
   localStorage.removeItem("token");
   localStorage.removeItem("userId");
   router.push("/login");
@@ -21,6 +23,7 @@ const handleLogout = () => {
     <div class="navbar-brand">ProgTalk</div>
     <RouterLink to="/profile" class="username" v-if="username">{{ username }}</RouterLink>
     <div class="navbar-links">
+      <RouterLink v-if="isAdmin" to="/adminPanel" class="nav-link">Admin Panel</RouterLink>
       <RouterLink to="/home" class="nav-link">Home</RouterLink>
       <RouterLink to="/profile" class="nav-link">Profile</RouterLink>
       <button @click="handleLogout" class="nav-link logout-btn">Logout</button>
@@ -35,7 +38,6 @@ const handleLogout = () => {
   align-items: center;
   background-color: $background-lighter;
   padding: $padding-md $padding-lg;
-  // padding-bottom: 0;
   box-shadow: $box-shadow;
 }
 

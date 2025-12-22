@@ -7,6 +7,7 @@ const { isAdmin, isModerator, loadTopic, checkIfBlockedInTopic } = require("../m
 router.post("/", async (req, res) => {
   const { title, description } = req.body;
   try {
+    const io = req.app.get("io");
     const mainMod = await User.findById(req.user._id);
     const newTopic = new Topic({
       title,
@@ -14,6 +15,7 @@ router.post("/", async (req, res) => {
       parentTopic: null,
       mainModerator: req.user._id,
     });
+    io.to(`topics`).emit("newTopic", { newTopic: newTopic });
     await newTopic.save();
     res.status(201).json({ message: "Topic created successfully", topic: newTopic });
   } catch (err) {
@@ -36,12 +38,7 @@ router.get("/", async (req, res) => {
       query.parentTopic = null;
     }
 
-    const topics = await Topic.find(query)
-      .populate("mainModerator", "username")
-      .populate("moderators", "username")
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+    const topics = await Topic.find(query).populate("mainModerator", "username").populate("moderators", "username").skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
 
     const total = await Topic.countDocuments(query);
 
@@ -64,9 +61,7 @@ router.get("/", async (req, res) => {
 router.get("/:id/subtopics", async (req, res) => {
   try {
     const { id } = req.params;
-    const subtopics = await Topic.find({ parentTopic: id, isHidden: false })
-      .populate("mainModerator", "username")
-      .populate("moderators", "username");
+    const subtopics = await Topic.find({ parentTopic: id, isHidden: false }).populate("mainModerator", "username").populate("moderators", "username").sort({ createdAt: -1 });
     res.json(subtopics);
   } catch (err) {
     console.error("GET /:id/subtopics error:", err);
@@ -109,6 +104,7 @@ router.patch("/:id", loadTopic, isModerator, async (req, res) => {
 // POST /api/topics/:id/subtopics
 router.post("/:id/subtopics", loadTopic, isModerator, async (req, res) => {
   try {
+    const io = req.app.get("io");
     const parentTopic = req.topic;
     const { title, description } = req.body;
 
@@ -124,6 +120,7 @@ router.post("/:id/subtopics", loadTopic, isModerator, async (req, res) => {
     });
 
     await newSubtopic.save();
+    io.to(`subtopic-${parentTopic._id}`).emit("newSubtopic", { newSubtopic: newSubtopic });
     res.status(201).json({ message: "Subtopic created successfully", topic: newSubtopic });
   } catch (err) {
     console.error("POST /:id/subtopics error:", err);

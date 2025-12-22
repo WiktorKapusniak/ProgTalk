@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, computed, watch, nextTick } from "vue";
+import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRoute, RouterLink } from "vue-router";
@@ -9,7 +9,8 @@ import { useAuth } from "@/composables/useAuth";
 import "primeicons/primeicons.css";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
-
+import Breadcrumbs from "./Breadcrumbs.vue";
+import { useSubtopicSocket } from "@/composables/socket/subtopicSocket";
 const toast = useToast();
 const route = useRoute();
 const { username, userId, loadUsername } = useAuth();
@@ -17,6 +18,12 @@ const { username, userId, loadUsername } = useAuth();
 const currentTopic = ref<Topic>({} as Topic);
 const subTopics = ref<Topic[]>([]);
 const posts = ref<Post[]>([]);
+let subtopicHandlers: ReturnType<typeof useSubtopicSocket> | null = null;
+
+interface BreadcrumbItem {
+  label: string;
+  to?: string;
+}
 
 const isModerator = computed(() => {
   if (!currentTopic.value || !username.value) return false;
@@ -25,6 +32,18 @@ const isModerator = computed(() => {
   const isPromotedMod = currentTopic.value.moderators?.some((mod) => mod.username === username.value);
 
   return isMainMod || isPromotedMod;
+});
+
+const breadcrumbs = computed<BreadcrumbItem[]>(() => {
+  const items: BreadcrumbItem[] = [{ label: "Home", to: "/home" }];
+
+  if (currentTopic.value.title) {
+    items.push({
+      label: currentTopic.value.title,
+    });
+  }
+
+  return items;
 });
 const isLiked = (post: Post) => {
   return post.likes.includes(userId.value || "");
@@ -49,13 +68,7 @@ const handleLikePost = async (post: Post) => {
       await axios.post(`/api/posts/${post._id}/like`);
     }
   } catch (error) {
-    // Rollback przy błędzie
-    if (currentlyLiked) {
-      post.likes.push(userId.value);
-    } else {
-      const index = post.likes.indexOf(userId.value);
-      if (index > -1) post.likes.splice(index, 1);
-    }
+    console.error(error);
     toast.error("Failed to update like");
   }
 };
@@ -92,8 +105,37 @@ const fetchTopicData = async () => {
 onMounted(async () => {
   await loadUsername();
   await fetchTopicData();
+  subtopicHandlers = useSubtopicSocket(currentTopic.value._id);
+  subtopicHandlers.subscribeToSubtopic();
+  subtopicHandlers.onNewSubtopic(async (data: { newSubtopic: Topic }) => {
+    subTopics.value.unshift(data.newSubtopic);
+  });
+  subtopicHandlers.onNewPost(async (data: { newPost: Post }) => {
+    posts.value.unshift(data.newPost);
+    highlightCode();
+  });
+  subtopicHandlers.onPostLiked((data: { postId: string; likes: string[] }) => {
+    const post = posts.value.find((p) => p._id === data.postId);
+    if (post) {
+      post.likes = data.likes;
+    }
+  });
+  subtopicHandlers.onPostUnliked((data: { postId: string; likes: string[] }) => {
+    const post = posts.value.find((p) => p._id === data.postId);
+    if (post) {
+      post.likes = data.likes;
+    }
+  });
 });
-
+onBeforeUnmount(() => {
+  if (subtopicHandlers) {
+    subtopicHandlers.unsubscribeFromSubtopic();
+    subtopicHandlers.offNewSubtopic();
+    subtopicHandlers.offNewPost();
+    subtopicHandlers.offPostLiked();
+    subtopicHandlers.offPostUnliked();
+  }
+});
 watch(
   () => route.params.id,
   async (newId, oldId) => {
@@ -114,6 +156,7 @@ watch(
 
 <template>
   <div class="topic-view">
+    <Breadcrumbs :breadcrumbs="breadcrumbs" />
     <section class="topic-header">
       <h1 class="topic-title">{{ currentTopic.title }}</h1>
       <p class="topic-description">{{ currentTopic.description }}</p>
@@ -125,12 +168,7 @@ watch(
     <section class="subtopics-section">
       <div class="section-header">
         <h2>Podtematy</h2>
-        <RouterLink
-          v-if="isModerator"
-          :to="`/topic/${currentTopic._id}/create-subtopic`"
-          class="add-button"
-          title="Dodaj podtemat"
-        >
+        <RouterLink v-if="isModerator" :to="`/topic/${currentTopic._id}/create-subtopic`" class="add-button" title="Dodaj podtemat">
           <i class="pi pi-plus"></i>
           <span>Dodaj podtemat</span>
         </RouterLink>
@@ -142,11 +180,7 @@ watch(
       <ul v-else class="subtopic-list">
         <li v-for="subtopic in subTopics" :key="subtopic._id" class="subtopic-item">
           <RouterLink :to="`/topic/${subtopic._id}`" class="subtopic-link">
-            <i
-              v-if="username === subtopic.mainModerator.username"
-              class="pi pi-trash delete-icon"
-              @click.prevent="deleteTopic(subtopic._id)"
-            ></i>
+            <i v-if="username === subtopic.mainModerator.username" class="pi pi-trash delete-icon" @click.prevent="deleteTopic(subtopic._id)"></i>
             <div class="subtopic-header">
               <h2 class="subtopic-title">{{ subtopic.title }}</h2>
             </div>

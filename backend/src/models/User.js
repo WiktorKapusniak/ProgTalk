@@ -5,7 +5,7 @@ const userSchema = new Schema({
   email: { type: String, required: true, unique: true },
   createdAt: { type: Date, default: Date.now },
   role: { type: String, enum: ["user", "admin"], default: "user" },
-  Banned: { type: Boolean, default: false },
-  currentPage: { type: Number, default: 1 },
+  banned: { type: Boolean, default: false },
+  approved: { type: Boolean, default: false },
 });
 module.exports = model("User", userSchema);

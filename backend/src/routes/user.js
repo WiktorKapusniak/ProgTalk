@@ -20,6 +20,7 @@ router.get("/:id", async (req, res) => {
       createdAt: user.createdAt,
       role: user.role,
       Banned: user.Banned,
+      approved: user.approved,
       currentPage: user.currentPage,
     });
   } catch (err) {

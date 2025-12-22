@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import AdminPanel from "@/components/AdminPanel.vue";
+</script>
+<template>
+  <AdminPanel />
+</template>
+
+<style scoped lang="scss"></style>

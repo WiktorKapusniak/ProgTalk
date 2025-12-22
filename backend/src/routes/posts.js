@@ -12,11 +12,7 @@ router.get("/topics/:topicId/posts", loadTopic, async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find({ topic: topic._id, deleted: false })
-      .populate("author", "username")
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+    const posts = await Post.find({ topic: topic._id, deleted: false }).populate("author", "username").skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
 
     const total = await Post.countDocuments({ topic: topic._id, deleted: false });
 
@@ -58,8 +54,8 @@ router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (r
     const io = req.app.get("io");
 
     const populatedPost = await Post.findById(newPost._id).populate("author", "username");
-    io.to(`topic-${parentTopic._id}`).emit("new-post", {
-      post: populatedPost,
+    io.to(`subtopic-${parentTopic._id}`).emit("newPost", {
+      newPost: populatedPost,
     });
 
     res.status(201).json({ message: "Post created successfully", post: newPost });
@@ -108,7 +104,7 @@ router.post("/posts/:id/like", async (req, res) => {
     await post.save();
 
     const io = req.app.get("io");
-    io.to(`topic-${post.topic}`).emit("post-liked", { postId: post._id, likes: post.likes });
+    io.to(`subtopic-${post.topic}`).emit("postLiked", { postId: post._id, likes: post.likes });
 
     res.json({ message: "Post liked successfully" });
   } catch (err) {
@@ -132,7 +128,7 @@ router.delete("/posts/:id/like", async (req, res) => {
     post.likes.splice(likeIndex, 1);
     await post.save();
     const io = req.app.get("io");
-    io.to(`topic-${post.topic}`).emit("post-unliked", { postId: post._id, likes: post.likes });
+    io.to(`subtopic-${post.topic}`).emit("postUnliked", { postId: post._id, likes: post.likes });
     res.json({ message: "Post unliked successfully" });
   } catch (err) {
     console.error("DELETE /posts/:id/like error:", err);

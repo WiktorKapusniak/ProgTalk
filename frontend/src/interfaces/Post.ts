@@ -8,8 +8,8 @@ export default interface Post {
   content: string;
   code?: string;
   tags?: string[];
-  references?: string[]; // Array of Post IDs
-  likes: string[]; // Array of User IDs
+  references?: string[];
+  likes: string[];
   deleted: boolean;
   createdAt: string; // ISO date string from backend
 }

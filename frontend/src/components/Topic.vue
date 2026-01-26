@@ -335,19 +335,40 @@ watch(
               <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
             </div>
             <div class="post-content">{{ post.content }}</div>
+
             <pre v-if="post.code" class="post-code"><code>{{ post.code }}</code></pre>
-            <div class="post-footer">
-              <button @click.prevent="handleLikePost(post)" class="like-button">
-                <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-                {{ post.likes.length }}
-              </button>
-              <RouterLink
-                :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
-                class="like-button"
-                title="Odpowiedz na post"
-              >
-                <i class="pi pi-reply"></i>
-              </RouterLink>
+            <div class="post-footer" v-if="post.tags && post.tags.length">
+              <div v-if="post.tags && post.tags.length" class="post-tags">
+                <span v-for="tag in post.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+              </div>
+              <div>
+                <button @click.prevent="handleLikePost(post)" class="like-button">
+                  <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                  {{ post.likes.length }}
+                </button>
+                <RouterLink
+                  :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
+                  class="like-button"
+                  title="Odpowiedz na post"
+                >
+                  <i class="pi pi-reply"></i>
+                </RouterLink>
+              </div>
+            </div>
+            <div v-else class="post-footer-empty-tags">
+              <div>
+                <button @click.prevent="handleLikePost(post)" class="like-button">
+                  <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                  {{ post.likes.length }}
+                </button>
+                <RouterLink
+                  :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
+                  class="like-button"
+                  title="Odpowiedz na post"
+                >
+                  <i class="pi pi-reply"></i>
+                </RouterLink>
+              </div>
             </div>
           </div>
           <ul v-if="repliesMap[post._id] && repliesMap[post._id]!.length > 0" class="posts-list">
@@ -382,12 +403,29 @@ watch(
                 <span class="post-date">{{ new Date(reply.createdAt).toLocaleDateString() }}</span>
               </div>
               <div class="post-content">{{ reply.content }}</div>
+              <div v-if="reply.tags && reply.tags.length" class="post-tags">
+                <span v-for="tag in reply.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+              </div>
               <pre v-if="reply.code" class="post-code"><code>{{ reply.code }}</code></pre>
-              <div class="post-footer">
-                <button @click.prevent="handleLikePost(reply)" class="like-button">
-                  <i :class="isLiked(reply) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-                  {{ reply.likes.length }}
-                </button>
+
+              <div v-if="reply.tags && reply.tags.length" class="post-footer">
+                <div v-if="reply.tags && reply.tags.length" class="post-tags">
+                  <span v-for="tag in reply.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+                </div>
+                <div>
+                  <button @click.prevent="handleLikePost(reply)" class="like-button">
+                    <i :class="isLiked(reply) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                    {{ reply.likes.length }}
+                  </button>
+                </div>
+              </div>
+              <div v-else class="post-footer-empty-tags">
+                <div>
+                  <button @click.prevent="handleLikePost(post)" class="like-button">
+                    <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                    {{ post.likes.length }}
+                  </button>
+                </div>
               </div>
             </li>
           </ul>
@@ -661,24 +699,45 @@ watch(
 
   .post-footer {
     display: flex;
-    justify-content: flex-end;
-    gap: $margin-md;
-
-    .like-button {
-      background: transparent;
-      border: 1px solid $border-dark;
-      color: $text-light;
-      padding: $padding-sm $padding-md;
-
-      border-radius: $border-radius;
-      cursor: pointer;
-      transition: all 0.2s;
-
-      &:hover {
-        background: lighten($background-lighter, 5%);
-        border-color: $primary-color;
-      }
-    }
+    justify-content: space-between;
+    align-items: center;
   }
+  .post-footer-empty-tags {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+}
+.like-button {
+  background: transparent;
+  border: 1px solid $border-dark;
+  color: $text-light;
+  padding: $padding-sm $padding-md;
+  margin-right: 1rem;
+
+  border-radius: $border-radius;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: lighten($background-lighter, 5%);
+    border-color: $primary-color;
+  }
+}
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin: 0.5em 0 0.5em 0;
+}
+.post-tag {
+  background: $background-dark;
+  color: $primary-lighter;
+  border-radius: $border-radius;
+  padding: 0.2em 0.7em;
+  font-size: $font-size-base * 0.95;
+  font-weight: 500;
+  border: 1px solid $primary-color;
+  letter-spacing: 0.02em;
 }
 </style>

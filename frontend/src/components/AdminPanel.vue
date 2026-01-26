@@ -18,7 +18,9 @@ interface User {
 const pendingUsers = ref<User[]>([]);
 const bannedUsers = ref<User[]>([]);
 const isLoading = ref(false);
-
+const tags = ref<string[]>([]);
+const addTagForm = ref(false);
+const newTagName = ref("");
 const loadApprovalWaitlist = async () => {
   try {
     isLoading.value = true;
@@ -44,7 +46,18 @@ const loadBannedUsers = async () => {
     isLoading.value = false;
   }
 };
-
+const loadTags = async () => {
+  try {
+    isLoading.value = true;
+    const response = await axios.get("/api/tags");
+    tags.value = response.data.tags.map((t: any) => t.name);
+  } catch (error: any) {
+    console.error("Error loading tags:", error);
+    toast.error(error.response?.data?.message || "Failed to load tags");
+  } finally {
+    isLoading.value = false;
+  }
+};
 const approveUser = async (userId: string) => {
   try {
     await axios.post(`/api/admin-panel/users/${userId}/approve`);
@@ -66,9 +79,25 @@ const unbanUser = async (userId: string) => {
     toast.error(error.response?.data?.message || "Failed to unban user");
   }
 };
+const addTag = async () => {
+  try {
+    await axios.post("/api/tags", {
+      name: newTagName.value,
+    });
+    tags.value.push(newTagName.value);
+    toast.success("Tag created successfully");
+    newTagName.value = "";
+    addTagForm.value = false;
+  } catch (error: any) {
+    console.error("Error creating tag:", error);
+    toast.error(error.response?.data?.message || "Failed to create tag");
+  } finally {
+    isLoading.value = false;
+  }
+};
 
 onMounted(async () => {
-  await Promise.all([loadApprovalWaitlist(), loadBannedUsers()]);
+  await Promise.all([loadApprovalWaitlist(), loadBannedUsers(), loadTags()]);
 });
 </script>
 
@@ -118,6 +147,28 @@ onMounted(async () => {
           </div>
         </div>
       </section>
+
+      <section class="section" @mouseleave="addTagForm = false">
+        <div class="tag-header">
+          <h2>Manage Tags</h2>
+          <button class="btn-create-tag" @mouseenter="addTagForm = true">Create New Tag</button>
+        </div>
+        <div class="add-tag-form">
+          <div v-if="addTagForm">
+            <input type="text" placeholder="Tag Name" v-model="newTagName" />
+            <button @click="addTag">Add Tag</button>
+          </div>
+        </div>
+
+        <div v-if="tags.length === 0" class="empty-state">
+          <p>No tags created</p>
+        </div>
+        <div v-else class="tags-list">
+          <div v-for="tag in tags" :key="tag" class="tag-item">
+            <p>{{ tag }}</p>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -154,6 +205,7 @@ onMounted(async () => {
   padding: $padding-lg;
   border-radius: $border-radius-lg;
   box-shadow: $box-shadow;
+  position: relative;
 
   h2 {
     color: $primary-lighter;
@@ -246,6 +298,92 @@ onMounted(async () => {
   &:hover {
     background-color: #34ce57;
     transform: scale(1.05);
+  }
+}
+.btn-create-tag {
+  display: inline-block;
+  margin-bottom: $margin-md;
+  padding: $padding-sm $padding-md;
+  background-color: $primary-color;
+  color: $text-white;
+  border-radius: $border-radius;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  height: 40px;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background-color: $primary-lighter;
+    transform: scale(1.05);
+  }
+}
+.tags-list {
+  display: flex;
+  flex-direction: row;
+  gap: $margin-md;
+}
+.tag-item {
+  padding: $padding-md;
+  background-color: $background-dark;
+  border-radius: 1rem;
+  border: 1px solid $border-dark;
+  color: $text-white;
+  font-size: 1rem;
+  font-weight: 600;
+  color: $primary-color;
+}
+.tag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $margin-md;
+  border-bottom: 2px solid $primary-color;
+  h2 {
+    margin: 0;
+    border-bottom: none;
+  }
+}
+.add-tag-form {
+  margin-bottom: $margin-md;
+  position: absolute;
+  height: auto;
+  right: 20px;
+
+  input {
+    padding: $padding-sm;
+    border: 1px solid $border-dark;
+    background-color: $background-dark;
+    border-radius: $border-radius;
+    color: $text-white;
+    font-size: $font-size-base;
+    font-family: inherit;
+    margin-bottom: $margin-sm;
+    margin-right: $margin-sm;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+    }
+  }
+
+  button {
+    width: 100px;
+    padding: 0.5rem;
+    border: none;
+    border-radius: $border-radius;
+    background-color: $primary-color;
+    color: $text-white;
+    font-size: $font-size-base;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background-color: $primary-lighter;
+      transform: scale(1.05);
+    }
   }
 }
 </style>

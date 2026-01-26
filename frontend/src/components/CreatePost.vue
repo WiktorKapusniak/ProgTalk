@@ -18,7 +18,6 @@ interface PostForm {
   tags?: string[];
   reference?: string;
 }
-
 const form: PostForm = reactive({
   content: "",
   code: "",
@@ -29,7 +28,7 @@ const tags = ref<string[]>([]);
 
 onMounted(async () => {
   const response = await axios.get("/api/tags");
-  tags.value = response.data.tags;
+  tags.value = response.data.tags.map((t: any) => t.name);
   if (response.status !== 200) {
     toast.error("Failed to load tags.");
   }
@@ -58,7 +57,7 @@ const handleAddPost = async () => {
       tags: form.tags,
       reference: form.reference,
     });
-
+    console.log(tags.value);
     if (response.status === 201) {
       toast.success("Post dodany pomyślnie!");
       form.content = "";
@@ -92,9 +91,10 @@ const handleAddPost = async () => {
         <div class="input">
           <label for="tags">Tags</label>
           <div class="tags-container">
-            <select id="tags" v-model="form.tags" multiple>
-              <option v-for="tag in tags" :key="tag" :value="tag">{{ tag }}</option>
-            </select>
+            <div class="tag-item" v-for="tag in tags" :key="tag">
+              {{ tag }}
+              <input type="checkbox" :value="tag" v-model="form.tags" />
+            </div>
           </div>
         </div>
         <button type="submit" id="submitButton">Dodaj Post</button>
@@ -199,5 +199,30 @@ textarea {
 .quoted-content {
   color: $text-light;
   font-size: $font-size-base;
+}
+.tags-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: $margin-sm;
+}
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: $padding-sm;
+  background-color: $background-dark;
+  border-radius: 0.75rem;
+  border: 1px solid $border-dark;
+  color: $text-white;
+  font-size: $font-size-base;
+  font-weight: 500;
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: $primary-color;
+    cursor: pointer;
+  }
 }
 </style>

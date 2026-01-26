@@ -7,6 +7,9 @@ router.post("/", isAdmin, async (req, res) => {
   const { name } = req.body;
   try {
     const newTag = new Tag({ name });
+    if (await Tag.findOne({ name })) {
+      return res.status(400).json({ message: "Tag already exists" });
+    }
     await newTag.save();
     res.status(201).json({ message: "Tag created successfully", tag: newTag });
   } catch (err) {

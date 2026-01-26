@@ -18,6 +18,7 @@ const { username, userId, loadUsername } = useAuth();
 const currentTopic = ref<Topic>({} as Topic);
 const subTopics = ref<Topic[]>([]);
 const posts = ref<Post[]>([]);
+const hoveredPostId = ref<string | null>(null);
 let subtopicHandlers: ReturnType<typeof useSubtopicSocket> | null = null;
 
 interface BreadcrumbItem {
@@ -45,6 +46,7 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
 
   return items;
 });
+
 const isLiked = (post: Post) => {
   return post.likes.includes(userId.value || "");
 };
@@ -72,7 +74,44 @@ const handleLikePost = async (post: Post) => {
     toast.error("Failed to update like");
   }
 };
-
+const addModerator = async (modUsername: string) => {
+  try {
+    await axios.post(`/api/topics/${currentTopic.value._id}/moderators`, {
+      username: modUsername,
+    });
+    toast.success(`Użytkownik ${modUsername} został mianowany moderatorem.`);
+  } catch (error) {
+    toast.error(`Nie udało się mianować moderatora. ${(error as any).response?.data?.message || ""}`);
+  }
+};
+const deleteModerator = async (modUsername: string) => {
+  try {
+    await axios.delete(`/api/topics/${currentTopic.value._id}/moderators/${modUsername}`);
+    toast.success(`Użytkownik ${modUsername} przestał być moderatorem.`);
+  } catch (error) {
+    toast.error(`Nie udało się usunąć moderatora. ${(error as any).response?.data?.message || ""}`);
+  }
+};
+const BlockFromTopicAndAllSubtopics = async (blockedUsername: string) => {
+  try {
+    await axios.post(`/api/topics/${currentTopic.value._id}/block-user`, {
+      username: blockedUsername,
+    });
+    toast.success(`Użytkownik ${blockedUsername} został zablokowany w tym temacie i wszystkich podtematach.`);
+  } catch (error) {
+    toast.error(`Nie udało się zablokować użytkownika. ${(error as any).response?.data?.message || ""}`);
+  }
+};
+const UnblockFromTopicAndAllSubtopics = async (unblockedUsername: string) => {
+  try {
+    await axios.post(`/api/topics/${currentTopic.value._id}/unblock-user`, {
+      username: unblockedUsername,
+    });
+    toast.success(`Użytkownik ${unblockedUsername} został odblokowany w tym temacie i wszystkich podtematach.`);
+  } catch (error) {
+    toast.error(`Nie udało się odblokować użytkownika. ${(error as any).response?.data?.message || ""}`);
+  }
+};
 const deleteTopic = async (topicId: string) => {};
 
 const highlightCode = () => {
@@ -142,7 +181,7 @@ watch(
     if (newId && newId !== oldId) {
       await fetchTopicData();
     }
-  }
+  },
 );
 
 watch(
@@ -150,7 +189,7 @@ watch(
   () => {
     highlightCode();
   },
-  { deep: true }
+  { deep: true },
 );
 </script>
 
@@ -168,7 +207,12 @@ watch(
     <section class="subtopics-section">
       <div class="section-header">
         <h2>Podtematy</h2>
-        <RouterLink v-if="isModerator" :to="`/topic/${currentTopic._id}/create-subtopic`" class="add-button" title="Dodaj podtemat">
+        <RouterLink
+          v-if="isModerator"
+          :to="`/topic/${currentTopic._id}/create-subtopic`"
+          class="add-button"
+          title="Dodaj podtemat"
+        >
           <i class="pi pi-plus"></i>
           <span>Dodaj podtemat</span>
         </RouterLink>
@@ -180,7 +224,11 @@ watch(
       <ul v-else class="subtopic-list">
         <li v-for="subtopic in subTopics" :key="subtopic._id" class="subtopic-item">
           <RouterLink :to="`/topic/${subtopic._id}`" class="subtopic-link">
-            <i v-if="username === subtopic.mainModerator.username" class="pi pi-trash delete-icon" @click.prevent="deleteTopic(subtopic._id)"></i>
+            <i
+              v-if="username === subtopic.mainModerator.username"
+              class="pi pi-trash delete-icon"
+              @click.prevent="deleteTopic(subtopic._id)"
+            ></i>
             <div class="subtopic-header">
               <h2 class="subtopic-title">{{ subtopic.title }}</h2>
             </div>
@@ -206,9 +254,23 @@ watch(
         <p>Brak postów. Bądź pierwszy!</p>
       </div>
       <ul v-else class="posts-list">
-        <li v-for="post in posts" :key="post._id" class="post-item">
+        <li v-for="post in posts" :key="post._id" class="post-item" @mouseleave="hoveredPostId = null">
           <div class="post-header">
-            <span class="post-author">@{{ post.author.username }}</span>
+            <span class="post-author" @mouseenter="hoveredPostId = post._id">
+              @{{ post.author.username }}
+              <div v-if="hoveredPostId === post._id && isModerator" class="nick-box">
+                <button @click="addModerator(post.author.username)" class="nick-box-button">Mianuj moderatorem</button>
+                <button @click="deleteModerator(post.author.username)" class="nick-box-button">
+                  Zabierz moderatora
+                </button>
+                <button @click="BlockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
+                  Zablokuj
+                </button>
+                <button @click="UnblockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
+                  Odblokuj
+                </button>
+              </div>
+            </span>
             <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
           </div>
           <div class="post-content">{{ post.content }}</div>
@@ -421,6 +483,30 @@ watch(
     .post-author {
       color: $primary-lighter;
       font-weight: 600;
+      .nick-box {
+        position: absolute;
+        background: $background-dark;
+        color: $text-white;
+        padding: $padding-sm $padding-md;
+        border-radius: $border-radius;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        margin-top: $margin-sm;
+        font-size: $font-size-base * 0.9;
+      }
+      .nick-box-button {
+        display: block;
+        width: 100%;
+        background: transparent;
+        border: none;
+        color: $text-white;
+        text-align: left;
+        padding: $padding-sm 0;
+        cursor: pointer;
+
+        &:hover {
+          color: $primary-color;
+        }
+      }
     }
 
     .post-date {

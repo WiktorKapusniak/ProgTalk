@@ -38,7 +38,12 @@ router.get("/", async (req, res) => {
       query.parentTopic = null;
     }
 
-    const topics = await Topic.find(query).populate("mainModerator", "username").populate("moderators", "username").skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
+    const topics = await Topic.find(query)
+      .populate("mainModerator", "username")
+      .populate("moderators", "username")
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
 
     const total = await Topic.countDocuments(query);
 
@@ -61,7 +66,10 @@ router.get("/", async (req, res) => {
 router.get("/:id/subtopics", async (req, res) => {
   try {
     const { id } = req.params;
-    const subtopics = await Topic.find({ parentTopic: id, isHidden: false }).populate("mainModerator", "username").populate("moderators", "username").sort({ createdAt: -1 });
+    const subtopics = await Topic.find({ parentTopic: id, isHidden: false })
+      .populate("mainModerator", "username")
+      .populate("moderators", "username")
+      .sort({ createdAt: -1 });
     res.json(subtopics);
   } catch (err) {
     console.error("GET /:id/subtopics error:", err);
@@ -132,9 +140,10 @@ router.post("/:id/subtopics", loadTopic, isModerator, async (req, res) => {
 router.post("/:id/moderators", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
-    const { moderatorId } = req.body;
+    const { username } = req.body;
 
-    const userToAdd = await User.findById(moderatorId);
+    const userToAdd = await User.findOne({ username: username });
+    const moderatorId = userToAdd ? userToAdd._id.toString() : null;
     if (!userToAdd) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -151,11 +160,16 @@ router.post("/:id/moderators", loadTopic, isModerator, async (req, res) => {
   }
 });
 // DELETE /api/topics/:id/moderators/:moderatorId
-router.delete("/:id/moderators/:moderatorId", loadTopic, isModerator, async (req, res) => {
+router.delete("/:id/moderators/:username", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
-    const { moderatorId } = req.params;
+    const { username } = req.params;
 
+    const userToRemove = await User.findOne({ username: username });
+    const moderatorId = userToRemove ? userToRemove._id.toString() : null;
+    if (!userToRemove) {
+      return res.status(404).json({ message: "User not found" });
+    }
     if (topic.mainModerator.toString() === moderatorId) {
       return res.status(400).json({ message: "Cannot remove main moderator" });
     }
@@ -175,9 +189,10 @@ router.delete("/:id/moderators/:moderatorId", loadTopic, isModerator, async (req
 router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
-    const { userId, allowedSubtopics = [] } = req.body;
+    const { username, allowedSubtopics = [] } = req.body;
 
-    const userToBlock = await User.findById(userId);
+    const userToBlock = await User.findOne({ username });
+    const userId = userToBlock ? userToBlock._id.toString() : null;
     if (!userToBlock) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -204,7 +219,17 @@ router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
 router.post("/:id/unblock-user", loadTopic, isModerator, async (req, res) => {
   try {
     const topic = req.topic;
-    const { userId } = req.body;
+    const { username } = req.body;
+    const userToUnblock = await User.findOne({ username });
+    const userId = userToUnblock ? userToUnblock._id.toString() : null;
+    if (!userToUnblock) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isBlocked = topic.blockedUsers.find((b) => b.user.toString() === userId);
+    if (!isBlocked) {
+      return res.status(400).json({ message: "User is not blocked in this topic" });
+    }
 
     topic.blockedUsers = topic.blockedUsers.filter((b) => b.user.toString() !== userId);
 

@@ -122,7 +122,11 @@ onBeforeUnmount(() => {
       <ul v-else class="topic-list">
         <li v-for="topic in topics" :key="topic._id" class="topic-item">
           <RouterLink :to="`/topic/${topic._id}`" class="topic-link">
-            <i v-if="username === topic.mainModerator.username" class="pi pi-trash delete-icon" @click.prevent="deleteTopic(topic._id)"></i>
+            <i
+              v-if="username === topic.mainModerator.username"
+              class="pi pi-trash delete-icon"
+              @click.prevent="deleteTopic(topic._id)"
+            ></i>
             <div class="topic-header">
               <h2 class="topic-title">{{ topic.title }}</h2>
             </div>
@@ -133,7 +137,14 @@ onBeforeUnmount(() => {
           </RouterLink>
         </li>
       </ul>
-      <Pagination :page="pagination.page" :limit="pagination.limit" :total="pagination.total" :totalPages="pagination.totalPages" @page-changed="handlePageChange" @limit-changed="handleLimitChange" />
+      <Pagination
+        :page="pagination.page"
+        :limit="pagination.limit"
+        :total="pagination.total"
+        :totalPages="pagination.totalPages"
+        @page-changed="handlePageChange"
+        @limit-changed="handleLimitChange"
+      />
     </div>
   </section>
 </template>
@@ -156,7 +167,9 @@ onBeforeUnmount(() => {
   font-size: 1rem;
   text-decoration: none;
   box-shadow: $box-shadow;
-  transition: background-color 0.2s, transform 0.2s;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
 
   &:hover {
     background-color: darken($primary-color, 5%);

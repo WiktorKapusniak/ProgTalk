@@ -6,7 +6,7 @@ const postSchema = new Schema({
   content: { type: String, required: true },
   code: { type: String },
   tags: [{ type: String }],
-  references: [{ type: Schema.Types.ObjectId, ref: "Post" }],
+  reference: { type: Schema.Types.ObjectId, ref: "Post" },
   likes: [{ type: Schema.Types.ObjectId, ref: "User" }],
 
   deleted: { type: Boolean, default: false },

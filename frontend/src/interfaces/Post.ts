@@ -8,8 +8,8 @@ export default interface Post {
   content: string;
   code?: string;
   tags?: string[];
-  references?: string[];
+  reference?: string;
   likes: string[];
   deleted: boolean;
-  createdAt: string; // ISO date string from backend
+  createdAt: string;
 }

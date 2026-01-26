@@ -8,18 +8,22 @@ const toast = useToast();
 const router = useRouter();
 const route = useRoute();
 
+const props = defineProps<{ parentPostId?: string }>();
+const parentPostId = props.parentPostId ?? (route.params.parentPostId as string | undefined);
+const parentPost = ref<any>(null);
+
 interface PostForm {
   content: string;
   code?: string;
   tags?: string[];
-  references?: string[];
+  reference?: string;
 }
 
 const form: PostForm = reactive({
   content: "",
   code: "",
   tags: [],
-  references: [],
+  reference: undefined,
 });
 const tags = ref<string[]>([]);
 
@@ -29,18 +33,30 @@ onMounted(async () => {
   if (response.status !== 200) {
     toast.error("Failed to load tags.");
   }
+  if (parentPostId && parentPostId !== "null" && typeof parentPostId === "string") {
+    try {
+      const postResp = await axios.get(`/api/posts/${parentPostId}`);
+      parentPost.value = postResp.data.post;
+      form.reference = parentPostId;
+    } catch (e) {
+      parentPost.value = null;
+      form.reference = undefined;
+    }
+  } else {
+    parentPost.value = null;
+    form.reference = undefined;
+  }
 });
 
 const handleAddPost = async () => {
   try {
     const parentId = route.params.id as string;
-    const refId = route.query.ref as string | undefined;
 
     const response = await axios.post(`/api/topics/${parentId}/posts`, {
       content: form.content,
       code: form.code,
       tags: form.tags,
-      references: refId ? [refId] : [],
+      reference: form.reference,
     });
 
     if (response.status === 201) {
@@ -48,6 +64,7 @@ const handleAddPost = async () => {
       form.content = "";
       form.code = "";
       form.tags = [];
+      form.reference = undefined;
       router.push(`/topic/${parentId}`);
     }
   } catch (error) {
@@ -59,6 +76,10 @@ const handleAddPost = async () => {
   <section class="addTopicSection">
     <div class="addTopicContainer">
       <h2>Dodaj Post</h2>
+      <div v-if="parentPost" class="quoted-post">
+        <div class="quoted-author">Odpowiedź do: @{{ parentPost.author?.username }}</div>
+        <div class="quoted-content">{{ parentPost.content }}</div>
+      </div>
       <form @submit.prevent="handleAddPost">
         <div class="input">
           <label for="content">Content</label>
@@ -162,5 +183,21 @@ textarea {
   &:hover {
     background-color: $primary-lighter;
   }
+}
+.quoted-post {
+  background: $background-dark;
+  border-left: 3px solid $primary-color;
+  padding: $padding-md;
+  margin-bottom: $margin-md;
+  border-radius: $border-radius;
+}
+.quoted-author {
+  color: $primary-lighter;
+  font-weight: 600;
+  margin-bottom: 0.3em;
+}
+.quoted-content {
+  color: $text-light;
+  font-size: $font-size-base;
 }
 </style>

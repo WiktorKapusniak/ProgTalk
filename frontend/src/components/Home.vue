@@ -16,12 +16,14 @@ const { username, loadUsername } = useAuth();
 const { subscribeToTopics, unsubscribeFromTopics, onNewTopic, offNewTopic } = useTopicSocket();
 
 const topics = ref<Topic[]>([]);
+
 const pagination = reactive<PaginationProps>({
   page: parseInt(localStorage.getItem("currentPage")!) || 1,
   limit: parseInt(localStorage.getItem("topicsPerPage")!) || 10,
   total: 0,
   totalPages: 0,
 });
+
 const handlePageChange = async (newPage: number) => {
   try {
     const response = await axios.get("/api/topics", {

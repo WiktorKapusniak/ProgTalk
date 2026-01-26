@@ -45,6 +45,10 @@ const routes = [
         component: () => import("../views/CreatePostView.vue"),
       },
       {
+        path: "topic/:id/create-post/:parentPostId",
+        component: () => import("../views/CreatePostView.vue"),
+      },
+      {
         path: "adminpanel",
         component: () => import("../views/AdminPanelView.vue"),
       },

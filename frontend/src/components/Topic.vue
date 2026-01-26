@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
+import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount, reactive } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRoute, RouterLink } from "vue-router";
@@ -11,6 +11,8 @@ import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 import Breadcrumbs from "./Breadcrumbs.vue";
 import { useSubtopicSocket } from "@/composables/socket/subtopicSocket";
+import Pagination from "./Pagination.vue";
+import type PaginationProps from "@/interfaces/Pagination";
 const toast = useToast();
 const route = useRoute();
 const { username, userId, loadUsername } = useAuth();
@@ -18,6 +20,8 @@ const { username, userId, loadUsername } = useAuth();
 const currentTopic = ref<Topic>({} as Topic);
 const subTopics = ref<Topic[]>([]);
 const posts = ref<Post[]>([]);
+const mainPosts = ref<Post[]>([]);
+const repliesMap = ref<Record<string, Post[]>>({});
 const hoveredPostId = ref<string | null>(null);
 let subtopicHandlers: ReturnType<typeof useSubtopicSocket> | null = null;
 
@@ -26,6 +30,19 @@ interface BreadcrumbItem {
   to?: string;
 }
 
+const pagination = reactive<PaginationProps>({
+  page: 1,
+  limit: parseInt(localStorage.getItem("topicsPerPage")!) || 10,
+  total: 0,
+  totalPages: 0,
+});
+const handlePageChange = async (newPage: number) => {
+  await fetchMainPosts(newPage, pagination.limit);
+};
+const handleLimitChange = async (newLimit: number) => {
+  await fetchMainPosts(1, newLimit);
+  localStorage.setItem("topicsPerPage", newLimit.toString());
+};
 const isModerator = computed(() => {
   if (!currentTopic.value || !username.value) return false;
 
@@ -125,22 +142,46 @@ const highlightCode = () => {
 const fetchTopicData = async () => {
   try {
     const topicId = route.params.id;
-
     const topicResponse = await axios.get(`/api/topics/${topicId}`);
     currentTopic.value = topicResponse.data;
-
     const subtopicsResponse = await axios.get(`/api/topics/${topicId}/subtopics`);
     subTopics.value = subtopicsResponse.data;
-
-    const postsResponse = await axios.get(`/api/topics/${topicId}/posts`);
-    posts.value = postsResponse.data.posts;
-
+    await fetchMainPosts(pagination.page, pagination.limit);
     highlightCode();
   } catch (error) {
     toast.error("Failed to load topic data.");
   }
 };
+const fetchMainPosts = async (page = 1, limit = 10) => {
+  try {
+    const topicId = route.params.id;
+    const mainRes = await axios.get(`/api/topics/${topicId}/posts`, {
+      params: { page, limit },
+    });
+    mainPosts.value = mainRes.data.posts;
+    pagination.page = mainRes.data.pagination.page;
+    pagination.limit = mainRes.data.pagination.limit;
+    pagination.total = mainRes.data.pagination.total;
+    pagination.totalPages = mainRes.data.pagination.totalPages;
 
+    if (mainPosts.value.length > 0) {
+      const mainIds = mainPosts.value.map((p) => p._id);
+      const repliesRes = await axios.get(`/api/posts/replies`, {
+        params: { parentIds: mainIds.join(",") },
+      });
+      repliesMap.value = {};
+      for (const reply of repliesRes.data.replies) {
+        if (!repliesMap.value[reply.reference]) repliesMap.value[reply.reference] = [];
+        repliesMap.value[reply.reference]!.push(reply);
+      }
+    } else {
+      repliesMap.value = {};
+    }
+    posts.value = [...mainPosts.value, ...Object.values(repliesMap.value).flat()];
+  } catch (error) {
+    toast.error("Failed to load posts.");
+  }
+};
 onMounted(async () => {
   await loadUsername();
   await fetchTopicData();
@@ -150,7 +191,21 @@ onMounted(async () => {
     subTopics.value.unshift(data.newSubtopic);
   });
   subtopicHandlers.onNewPost(async (data: { newPost: Post }) => {
-    posts.value.unshift(data.newPost);
+    const post = data.newPost;
+    if (!post.reference) {
+      if (pagination.page === 1) {
+        mainPosts.value.unshift(post);
+        if (mainPosts.value.length > pagination.limit) {
+          mainPosts.value.pop();
+        }
+      }
+      pagination.total += 1;
+      pagination.totalPages = Math.ceil(pagination.total / pagination.limit);
+    } else {
+      if (!repliesMap.value[post.reference]) repliesMap.value[post.reference] = [];
+      repliesMap.value[post.reference]!.push(post);
+    }
+    posts.value = [...mainPosts.value, ...Object.values(repliesMap.value).flat()];
     highlightCode();
   });
   subtopicHandlers.onPostLiked((data: { postId: string; likes: string[] }) => {
@@ -254,35 +309,98 @@ watch(
         <p>Brak postów. Bądź pierwszy!</p>
       </div>
       <ul v-else class="posts-list">
-        <li v-for="post in posts" :key="post._id" class="post-item" @mouseleave="hoveredPostId = null">
-          <div class="post-header">
-            <span class="post-author" @mouseenter="hoveredPostId = post._id">
-              @{{ post.author.username }}
-              <div v-if="hoveredPostId === post._id && isModerator" class="nick-box">
-                <button @click="addModerator(post.author.username)" class="nick-box-button">Mianuj moderatorem</button>
-                <button @click="deleteModerator(post.author.username)" class="nick-box-button">
-                  Zabierz moderatora
-                </button>
-                <button @click="BlockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
-                  Zablokuj
-                </button>
-                <button @click="UnblockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
-                  Odblokuj
+        <li v-for="post in mainPosts" :key="post._id" @mouseleave="hoveredPostId = null">
+          <div class="post-item">
+            <div class="post-header">
+              <span class="post-author" @mouseenter="hoveredPostId = post._id">
+                @{{ post.author.username }}
+                <div
+                  v-if="hoveredPostId === post._id && isModerator && post.author.username !== username"
+                  class="nick-box"
+                >
+                  <button @click="addModerator(post.author.username)" class="nick-box-button">
+                    Mianuj moderatorem
+                  </button>
+                  <button @click="deleteModerator(post.author.username)" class="nick-box-button">
+                    Zabierz moderatora
+                  </button>
+                  <button @click="BlockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
+                    Zablokuj
+                  </button>
+                  <button @click="UnblockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
+                    Odblokuj
+                  </button>
+                </div>
+              </span>
+              <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
+            </div>
+            <div class="post-content">{{ post.content }}</div>
+            <pre v-if="post.code" class="post-code"><code>{{ post.code }}</code></pre>
+            <div class="post-footer">
+              <button @click.prevent="handleLikePost(post)" class="like-button">
+                <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                {{ post.likes.length }}
+              </button>
+              <RouterLink
+                :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
+                class="like-button"
+                title="Odpowiedz na post"
+              >
+                <i class="pi pi-reply"></i>
+              </RouterLink>
+            </div>
+          </div>
+          <ul v-if="repliesMap[post._id] && repliesMap[post._id]!.length > 0" class="posts-list">
+            <li
+              v-for="reply in repliesMap[post._id]"
+              :key="reply._id"
+              class="post-item"
+              id="reply-post"
+              @mouseleave="hoveredPostId = null"
+            >
+              <div class="post-header">
+                <span class="post-author" @mouseenter="hoveredPostId = reply._id">
+                  @{{ reply.author.username }}
+                  <div
+                    v-if="hoveredPostId === reply._id && isModerator && reply.author.username !== username"
+                    class="nick-box"
+                  >
+                    <button @click="addModerator(reply.author.username)" class="nick-box-button">
+                      Mianuj moderatorem
+                    </button>
+                    <button @click="deleteModerator(reply.author.username)" class="nick-box-button">
+                      Zabierz moderatora
+                    </button>
+                    <button @click="BlockFromTopicAndAllSubtopics(reply.author.username)" class="nick-box-button">
+                      Zablokuj
+                    </button>
+                    <button @click="UnblockFromTopicAndAllSubtopics(reply.author.username)" class="nick-box-button">
+                      Odblokuj
+                    </button>
+                  </div>
+                </span>
+                <span class="post-date">{{ new Date(reply.createdAt).toLocaleDateString() }}</span>
+              </div>
+              <div class="post-content">{{ reply.content }}</div>
+              <pre v-if="reply.code" class="post-code"><code>{{ reply.code }}</code></pre>
+              <div class="post-footer">
+                <button @click.prevent="handleLikePost(reply)" class="like-button">
+                  <i :class="isLiked(reply) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                  {{ reply.likes.length }}
                 </button>
               </div>
-            </span>
-            <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
-          </div>
-          <div class="post-content">{{ post.content }}</div>
-          <pre v-if="post.code" class="post-code"><code>{{ post.code }}</code></pre>
-          <div class="post-footer">
-            <button @click.prevent="handleLikePost(post)" class="like-button">
-              <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-              {{ post.likes.length }}
-            </button>
-          </div>
+            </li>
+          </ul>
         </li>
       </ul>
+      <Pagination
+        :page="pagination.page"
+        :limit="pagination.limit"
+        :total="pagination.total"
+        :totalPages="pagination.totalPages"
+        @page-changed="handlePageChange"
+        @limit-changed="handleLimitChange"
+      />
     </section>
   </div>
 </template>
@@ -467,7 +585,13 @@ watch(
   flex-direction: column;
   gap: $margin-lg;
 }
-
+#reply-post {
+  margin-top: $margin-md;
+  margin-left: $padding-lg * 2.5;
+  padding: $padding-md * 1.5;
+  border-radius: $border-radius-lg;
+  border-left: 3px solid $primary-lighter;
+}
 .post-item {
   background: $background-lighter;
   padding: $padding-md * 1.5;

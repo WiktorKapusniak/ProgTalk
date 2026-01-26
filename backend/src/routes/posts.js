@@ -9,18 +9,25 @@ const { isAdmin, isModerator, loadTopic, checkIfBlockedInTopic } = require("../m
 router.get("/topics/:topicId/posts", loadTopic, async (req, res) => {
   try {
     const topic = req.topic;
-    const { page = 1, limit = 20 } = req.query;
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find({ topic: topic._id, deleted: false }).populate("author", "username").skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
+    //tylko posty głowne
+    const posts = await Post.find({ topic: topic._id, deleted: false, reference: null })
+      .populate("author", "username")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
 
-    const total = await Post.countDocuments({ topic: topic._id, deleted: false });
+    const total = await Post.countDocuments({ topic: topic._id, deleted: false, reference: null });
 
     return res.json({
       posts,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
         totalPages: Math.ceil(total / limit),
       },
@@ -30,12 +37,43 @@ router.get("/topics/:topicId/posts", loadTopic, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+// GET /api/posts/replies?parentIds=comma,separated,ids
+router.get("/posts/replies", async (req, res) => {
+  try {
+    const { parentIds } = req.query;
+    if (!parentIds) {
+      return res.json({ replies: [] });
+    }
+    const ids = parentIds.split(",");
+    const replies = await Post.find({ reference: { $in: ids }, deleted: false })
+      .populate("author", "username")
+      .sort({ createdAt: 1 });
+    res.json({ replies });
+  } catch (err) {
+    console.error("GET /posts/replies error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+// GET /api/posts/:postId
+router.get("/posts/:postId", async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const post = await Post.findById(postId).populate("author", "username");
+    if (!post || post.deleted) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    res.json({ post });
+  } catch (err) {
+    console.error("GET /posts/:postId error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // POST /api/topics/:topicId/posts
 router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (req, res) => {
   try {
     const parentTopic = req.topic;
-    const { content, code, tags, references } = req.body;
+    const { content, code, tags, reference } = req.body;
     const author = req.user._id;
 
     if (parentTopic.isClosed) {
@@ -47,20 +85,50 @@ router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (r
       code,
       tags,
       author,
-      references,
+      reference,
       topic: parentTopic._id,
     });
     await newPost.save();
     const io = req.app.get("io");
-
     const populatedPost = await Post.findById(newPost._id).populate("author", "username");
     io.to(`subtopic-${parentTopic._id}`).emit("newPost", {
       newPost: populatedPost,
     });
-
-    res.status(201).json({ message: "Post created successfully", post: newPost });
+    res.status(201).json({ message: "Post created successfully", post: populatedPost });
   } catch (err) {
     console.error("POST /:topicId/posts error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// POST /api/topics/:topicId/posts/referencePost
+router.post("/topics/:topicId/posts/referencePost", loadTopic, checkIfBlockedInTopic, async (req, res) => {
+  try {
+    const parentTopic = req.topic;
+    const { content, code, tags, reference } = req.body;
+    const author = req.user._id;
+
+    if (parentTopic.isClosed) {
+      return res.status(403).json({ message: "Cannot add post to closed topic" });
+    }
+
+    const newPost = new Post({
+      content,
+      code,
+      tags,
+      author,
+      reference,
+      topic: parentTopic._id,
+    });
+    await newPost.save();
+    const io = req.app.get("io");
+    const populatedPost = await Post.findById(newPost._id).populate("author", "username");
+    io.to(`subtopic-${parentTopic._id}`).emit("newPost", {
+      newPost: populatedPost,
+    });
+    res.status(201).json({ message: "Post created successfully", post: populatedPost });
+  } catch (err) {
+    console.error("POST /:topicId/posts/referencePost error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

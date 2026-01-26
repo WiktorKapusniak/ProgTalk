@@ -3,6 +3,16 @@ const express = require("express");
 const router = express.Router();
 const Topic = require("../models/Topic");
 const { isAdmin, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
+
+async function getAllSubtopicIds(topicId) {
+  const subtopics = await Topic.find({ parentTopic: topicId }, "_id");
+  let ids = subtopics.map((t) => t._id.toString());
+  for (const sub of subtopics) {
+    const subIds = await getAllSubtopicIds(sub._id);
+    ids = ids.concat(subIds);
+  }
+  return ids;
+}
 // POST /api/topics
 router.post("/", async (req, res) => {
   const { title, description } = req.body;
@@ -120,11 +130,17 @@ router.post("/:id/subtopics", loadTopic, isModerator, async (req, res) => {
       return res.status(403).json({ message: "Cannot add subtopic to closed topic" });
     }
 
+    const blockedUsersCopy = parentTopic.blockedUsers.map((b) => ({
+      user: b.user,
+      allowedSubtopics: b.allowedSubtopics || [],
+    }));
+
     const newSubtopic = new Topic({
       title,
       description,
       parentTopic: parentTopic._id,
       mainModerator: req.user._id,
+      blockedUsers: blockedUsersCopy,
     });
 
     await newSubtopic.save();
@@ -197,18 +213,39 @@ router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (topic.mainModerator && topic.mainModerator.toString() === userId) {
+      return res.status(400).json({ message: "Cannot block main moderator of this topic" });
+    }
     const alreadyBlocked = topic.blockedUsers.find((b) => b.user.toString() === userId);
-    if (alreadyBlocked) {
-      return res.status(400).json({ message: "User already blocked in this topic" });
+    if (!alreadyBlocked) {
+      topic.blockedUsers.push({
+        user: userId,
+        allowedSubtopics: allowedSubtopics || [],
+      });
+      topic.moderators = topic.moderators.filter((modId) => modId.toString() !== userId);
+
+      await topic.save();
     }
 
-    topic.blockedUsers.push({
-      user: userId,
-      allowedSubtopics: allowedSubtopics || [],
-    });
+    const subtopicIds = await getAllSubtopicIds(topic._id);
+    for (const subId of subtopicIds) {
+      const subtopic = await Topic.findById(subId);
+      if (!subtopic) continue;
+      const alreadyBlockedInSub = subtopic.blockedUsers.find((b) => b.user.toString() === userId);
+      if (!alreadyBlockedInSub) {
+        subtopic.blockedUsers.push({
+          user: userId,
+          allowedSubtopics: [],
+        });
+        subtopic.moderators = subtopic.moderators.filter((modId) => modId.toString() !== userId);
+        if (subtopic.mainModerator && subtopic.mainModerator.toString() === userId) {
+          subtopic.mainModerator = null;
+        }
+        await subtopic.save();
+      }
+    }
 
-    await topic.save();
-    res.json({ message: "User blocked successfully", topic });
+    res.json({ message: "User blocked in topic and all subtopics", topic });
   } catch (err) {
     console.error("POST /:id/block-user error:", err);
     res.status(500).json({ message: "Server error" });
@@ -226,15 +263,18 @@ router.post("/:id/unblock-user", loadTopic, isModerator, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const isBlocked = topic.blockedUsers.find((b) => b.user.toString() === userId);
-    if (!isBlocked) {
-      return res.status(400).json({ message: "User is not blocked in this topic" });
+    topic.blockedUsers = topic.blockedUsers.filter((b) => b.user.toString() !== userId);
+    await topic.save();
+
+    const subtopicIds = await getAllSubtopicIds(topic._id);
+    for (const subId of subtopicIds) {
+      const subtopic = await Topic.findById(subId);
+      if (!subtopic) continue;
+      subtopic.blockedUsers = subtopic.blockedUsers.filter((b) => b.user.toString() !== userId);
+      await subtopic.save();
     }
 
-    topic.blockedUsers = topic.blockedUsers.filter((b) => b.user.toString() !== userId);
-
-    await topic.save();
-    res.json({ message: "User unblocked successfully" });
+    res.json({ message: "User unblocked in topic and all subtopics" });
   } catch (err) {
     console.error("POST /:id/unblock-user error:", err);
     res.status(500).json({ message: "Server error" });

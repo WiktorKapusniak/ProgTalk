@@ -14,13 +14,18 @@ router.get("/topics/:topicId/posts", loadTopic, async (req, res) => {
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find({ topic: topic._id, deleted: false, reference: null })
-      .populate("author", "username")
-      .skip(skip)
-      .limit(limit)
-      .sort({ createdAt: -1 });
+    const query = {
+      topic: topic._id,
+      reference: null,
+    };
 
-    const total = await Post.countDocuments({ topic: topic._id, deleted: false, reference: null });
+    if (!req.user || req.user.role !== "admin") {
+      query.deleted = false;
+    }
+
+    const posts = await Post.find(query).populate("author", "username").skip(skip).limit(limit).sort({ createdAt: -1 });
+
+    const total = await Post.countDocuments(query);
 
     return res.json({
       posts,
@@ -44,9 +49,15 @@ router.get("/posts/replies", async (req, res) => {
       return res.json({ replies: [] });
     }
     const ids = parentIds.split(",");
-    const replies = await Post.find({ reference: { $in: ids }, deleted: false })
-      .populate("author", "username")
-      .sort({ createdAt: 1 });
+    const query = {
+      reference: { $in: ids },
+    };
+
+    if (!req.user || req.user.role !== "admin") {
+      query.deleted = false;
+    }
+
+    const replies = await Post.find(query).populate("author", "username").sort({ createdAt: 1 });
     res.json({ replies });
   } catch (err) {
     console.error("GET /posts/replies error:", err);
@@ -58,7 +69,11 @@ router.get("/posts/:postId", async (req, res) => {
   try {
     const { postId } = req.params;
     const post = await Post.findById(postId).populate("author", "username");
-    if (!post || post.deleted) {
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (post.deleted && req.user.role !== "admin") {
       return res.status(404).json({ message: "Post not found" });
     }
     res.json({ post });
@@ -147,7 +162,7 @@ router.delete("/posts/:postId", async (req, res) => {
     await post.save();
 
     const io = req.app.get("io");
-    io.to(`topic-${post.topic}`).emit("post-deleted", { postId: post._id });
+    io.to(`subtopic-${post.topic}`).emit("post-deleted", { postId: post._id });
 
     res.json({ message: "Post deleted successfully" });
   } catch (err) {

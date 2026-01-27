@@ -86,6 +86,18 @@ export function useSubtopicSocket(parentTopicId: string) {
     socket.off("postUnliked");
   };
 
+  const onPostDeleted = (callback: (data: { postId: string }) => void) => {
+    const socket = getSocket();
+    if (!socket) return;
+    socket.on("post-deleted", callback);
+  };
+
+  const offPostDeleted = () => {
+    const socket = getSocket();
+    if (!socket) return;
+    socket.off("post-deleted");
+  };
+
   return {
     subscribeToSubtopic,
     unsubscribeFromSubtopic,
@@ -97,5 +109,7 @@ export function useSubtopicSocket(parentTopicId: string) {
     offPostLiked,
     onPostUnliked,
     offPostUnliked,
+    onPostDeleted,
+    offPostDeleted,
   };
 }

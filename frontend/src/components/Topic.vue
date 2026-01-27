@@ -191,14 +191,19 @@ const ban = async (banUsername: string) => {
     toast.error(`Nie udało się zbanować użytkownika. ${(error as any).response?.data?.message || ""}`);
   }
 };
-const unban = async (unbanUsername: string) => {
+const deletePost = async (postId: string) => {
+  if (!confirm("Czy na pewno chcesz usunąć ten post?")) return;
+
   try {
-    await axios.post(`/api/admin/unban/${unbanUsername}`);
-    toast.success(`Użytkownik ${unbanUsername} został odbanowany.`);
-  } catch (error) {
-    toast.error(`Nie udało się odbanować użytkownika. ${(error as any).response?.data?.message || ""}`);
+    await axios.delete(`/api/posts/${postId}`);
+    toast.success("Post został usunięty");
+
+    await fetchMainPosts(pagination.page, pagination.limit);
+  } catch (err) {
+    toast.error("Nie udało się usunąć posta");
   }
 };
+
 const highlightCode = () => {
   nextTick(() => {
     document.querySelectorAll("pre code").forEach((block) => {
@@ -299,6 +304,17 @@ onMounted(async () => {
       post.likes = data.likes;
     }
   });
+  subtopicHandlers.onPostDeleted((data: { postId: string }) => {
+    const { postId } = data;
+
+    mainPosts.value = mainPosts.value.filter((p) => p._id !== postId);
+
+    Object.keys(repliesMap.value).forEach((key) => {
+      repliesMap.value[key] = repliesMap.value[key]!.filter((r) => r._id !== postId);
+    });
+
+    posts.value = [...mainPosts.value, ...Object.values(repliesMap.value).flat()];
+  });
 });
 onBeforeUnmount(() => {
   if (subtopicHandlers) {
@@ -307,6 +323,7 @@ onBeforeUnmount(() => {
     subtopicHandlers.offNewPost();
     subtopicHandlers.offPostLiked();
     subtopicHandlers.offPostUnliked();
+    subtopicHandlers.offPostDeleted();
   }
 });
 watch(
@@ -473,7 +490,15 @@ watch(
                   </div>
                 </span>
 
-                <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
+                <span class="post-date"
+                  ><button
+                    v-if="post.author._id === userId || isAdmin"
+                    class="delete-post-btn"
+                    @click.prevent="deletePost(post._id)"
+                  >
+                    <i class="pi pi-trash"></i></button
+                  >{{ new Date(post.createdAt).toLocaleDateString() }}</span
+                >
               </div>
               <div class="post-content">{{ post.content }}</div>
 
@@ -559,7 +584,15 @@ watch(
                     </div>
                   </span>
 
-                  <span class="post-date">{{ new Date(reply.createdAt).toLocaleDateString() }}</span>
+                  <span class="post-date">
+                    <button
+                      v-if="post.author._id === userId || isAdmin"
+                      class="delete-post-btn"
+                      @click.prevent="deletePost(post._id)"
+                    >
+                      <i class="pi pi-trash"></i></button
+                    >{{ new Date(reply.createdAt).toLocaleDateString() }}</span
+                  >
                 </div>
                 <div class="post-content">{{ reply.content }}</div>
 
@@ -1045,6 +1078,19 @@ watch(
         color: lighten($primary-color, 10%);
       }
     }
+  }
+}
+.delete-post-btn {
+  background: transparent;
+  border: none;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 0.5rem;
+  margin-right: 10px;
+
+  &:hover {
+    color: lighten(#e74c3c, 10%);
   }
 }
 </style>

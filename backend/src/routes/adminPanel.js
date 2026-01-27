@@ -5,7 +5,7 @@ const { isLoggedIn, isAdmin } = require("../middleware/auth");
 
 router.get("/users/banned", async (req, res) => {
   try {
-    const bannedUsers = await User.find({ Banned: true }).select("-password");
+    const bannedUsers = await User.find({ banned: true }).select("-password");
     res.status(200).json(bannedUsers);
   } catch (err) {
     console.error("GET /users/banned error:", err);

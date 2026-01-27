@@ -9,7 +9,7 @@ function isLoggedIn(req, res, next) {
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    if (user.Banned) {
+    if (user.banned) {
       return res.status(403).json({ message: "Forbidden: User is banned" });
     }
     req.user = user;
@@ -60,7 +60,10 @@ async function loadTopic(req, res, next) {
 function isModerator(req, res, next) {
   const topic = req.topic;
 
-  const isTopicModerator = topic.mainModerator.toString() === req.user._id.toString() || topic.moderators.some((mod) => mod.toString() === req.user._id.toString()) || req.user.role === "admin";
+  const isTopicModerator =
+    topic.mainModerator.toString() === req.user._id.toString() ||
+    topic.moderators.some((mod) => mod.toString() === req.user._id.toString()) ||
+    req.user.role === "admin";
 
   if (!isTopicModerator) {
     return res.status(403).json({ message: "You are not a moderator of this topic" });

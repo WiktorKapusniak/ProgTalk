@@ -2,7 +2,7 @@ const User = require("../models/User");
 const express = require("express");
 const router = express.Router();
 const Topic = require("../models/Topic");
-const { isAdmin, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
+const { isAdmin, isLoggedIn, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
 
 async function getAllSubtopicIds(topicId) {
   const subtopics = await Topic.find({ parentTopic: topicId }, "_id");
@@ -35,13 +35,15 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/topics?page=1&limit=20&parentId=null
-router.get("/", async (req, res) => {
+router.get("/", isLoggedIn, async (req, res) => {
   try {
     const { page = 1, limit = 10, parentId } = req.query;
     const skip = (page - 1) * limit;
 
-    const query = { isHidden: false };
-
+    let query = {};
+    if (!req.user || req.user.role !== "admin") {
+      query.isHidden = false;
+    }
     if (parentId !== undefined && parentId !== null) {
       query.parentTopic = parentId;
     } else {
@@ -73,10 +75,16 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/topics/:id/subtopics
-router.get("/:id/subtopics", async (req, res) => {
+router.get("/:id/subtopics", isLoggedIn, async (req, res) => {
   try {
     const { id } = req.params;
-    const subtopics = await Topic.find({ parentTopic: id, isHidden: false })
+    // Pobierz użytkownika z tokena jeśli jest
+    const user = req.user;
+    let query = { parentTopic: id };
+    if (!user || user.role !== "admin") {
+      query.isHidden = false;
+    }
+    const subtopics = await Topic.find(query)
       .populate("mainModerator", "username")
       .populate("moderators", "username")
       .sort({ createdAt: -1 });
@@ -88,12 +96,18 @@ router.get("/:id/subtopics", async (req, res) => {
 });
 
 // GET /api/topics/:id
-router.get("/:id", async (req, res) => {
+
+router.get("/:id", isLoggedIn, async (req, res) => {
   try {
     const { id } = req.params;
     const topic = await Topic.findById(id).populate("mainModerator", "username").populate("moderators", "username");
-    if (!topic || topic.isHidden) {
+    if (!topic) {
       return res.status(404).json({ message: "Topic not found" });
+    }
+    if (topic.isHidden) {
+      if (!req.user || req.user.role !== "admin") {
+        return res.status(404).json({ message: "Topic not found" });
+      }
     }
     res.json(topic);
   } catch (err) {
@@ -103,7 +117,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PATCH /api/topics/:id
-router.patch("/:id", loadTopic, isModerator, async (req, res) => {
+router.patch("/:id", loadTopic, async (req, res) => {
   try {
     const topic = req.topic;
     const { title, description } = req.body;
@@ -120,7 +134,7 @@ router.patch("/:id", loadTopic, isModerator, async (req, res) => {
 });
 
 // POST /api/topics/:id/subtopics
-router.post("/:id/subtopics", loadTopic, isModerator, async (req, res) => {
+router.post("/:id/subtopics", loadTopic, async (req, res) => {
   try {
     const io = req.app.get("io");
     const parentTopic = req.topic;
@@ -164,7 +178,10 @@ router.post("/:id/moderators", loadTopic, isModerator, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (topic.moderators.includes(moderatorId) || topic.mainModerator.toString() === moderatorId) {
+    if (
+      topic.moderators.map((id) => id.toString()).includes(moderatorId) ||
+      topic.mainModerator.toString() === moderatorId
+    ) {
       return res.status(400).json({ message: "User is already a moderator" });
     }
     topic.moderators.push(moderatorId);
@@ -216,6 +233,7 @@ router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
     if (topic.mainModerator && topic.mainModerator.toString() === userId) {
       return res.status(400).json({ message: "Cannot block main moderator of this topic" });
     }
+    const subtopicIds = await getAllSubtopicIds(topic._id);
     const alreadyBlocked = topic.blockedUsers.find((b) => b.user.toString() === userId);
     if (!alreadyBlocked) {
       topic.blockedUsers.push({
@@ -223,14 +241,14 @@ router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
         allowedSubtopics: allowedSubtopics || [],
       });
       topic.moderators = topic.moderators.filter((modId) => modId.toString() !== userId);
-
       await topic.save();
     }
-
-    const subtopicIds = await getAllSubtopicIds(topic._id);
     for (const subId of subtopicIds) {
       const subtopic = await Topic.findById(subId);
       if (!subtopic) continue;
+      if (subtopic.mainModerator && subtopic.mainModerator.toString() === userId) {
+        continue;
+      }
       const alreadyBlockedInSub = subtopic.blockedUsers.find((b) => b.user.toString() === userId);
       if (!alreadyBlockedInSub) {
         subtopic.blockedUsers.push({
@@ -238,14 +256,10 @@ router.post("/:id/block-user", loadTopic, isModerator, async (req, res) => {
           allowedSubtopics: [],
         });
         subtopic.moderators = subtopic.moderators.filter((modId) => modId.toString() !== userId);
-        if (subtopic.mainModerator && subtopic.mainModerator.toString() === userId) {
-          subtopic.mainModerator = null;
-        }
         await subtopic.save();
       }
     }
-
-    res.json({ message: "User blocked in topic and all subtopics", topic });
+    res.json({ message: "User blocked in topic and all subtopics (except where user is main moderator)", topic });
   } catch (err) {
     console.error("POST /:id/block-user error:", err);
     res.status(500).json({ message: "Server error" });

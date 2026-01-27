@@ -69,9 +69,9 @@ const approveUser = async (userId: string) => {
   }
 };
 
-const unbanUser = async (userId: string) => {
+const unbanUser = async (username: string) => {
   try {
-    await axios.post(`/api/admin/unban/${userId}`);
+    await axios.post(`/api/admin/unban/${username}`);
     toast.success("User unbanned successfully");
     await loadBannedUsers();
   } catch (error: any) {
@@ -142,7 +142,7 @@ onMounted(async () => {
               <p class="date">Registered: {{ new Date(user.createdAt).toLocaleDateString() }}</p>
             </div>
             <div class="user-actions">
-              <button @click="unbanUser(user._id)" class="btn-unban">Unban</button>
+              <button @click="unbanUser(user.username)" class="btn-unban">Unban</button>
             </div>
           </div>
         </div>

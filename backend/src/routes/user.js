@@ -2,8 +2,8 @@ const User = require("../models/User");
 const express = require("express");
 const router = express.Router();
 const { hashPassword } = require("../utils/auth");
-
-router.get("/:id", async (req, res) => {
+const { isLoggedIn } = require("../middleware/auth");
+router.get("/:id", isLoggedIn, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
@@ -14,12 +14,15 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (user.banned) {
+      return res.status(403).json({ message: "User is banned" });
+    }
     res.json({
       username: user.username,
       email: user.email,
       createdAt: user.createdAt,
       role: user.role,
-      Banned: user.Banned,
+      banned: user.banned,
       approved: user.approved,
       currentPage: user.currentPage,
     });

@@ -56,6 +56,10 @@ const routes = [
         path: "not-approved",
         component: () => import("../views/NotApprovedView.vue"),
       },
+      {
+        path: "banned",
+        component: () => import("../views/BannedView.vue"),
+      },
     ],
   },
 ];
@@ -81,7 +85,14 @@ router.beforeEach(async (to, _from, next) => {
             Authorization: `Bearer ${token}`,
           },
         });
-
+        if (response.status === 403) {
+          // Zbanowany lub brak uprawnień
+          if (to.path !== "/banned") {
+            return next("/banned");
+          } else {
+            return next();
+          }
+        }
         if (response.ok) {
           connectSocket();
           const userData = await response.json();
@@ -95,11 +106,9 @@ router.beforeEach(async (to, _from, next) => {
               return next("/not-approved");
             }
           }
-
           if (to.meta.requiresAuth && !isApproved && !isAdmin && to.path !== "/not-approved") {
             return next("/not-approved");
           }
-
           if ((isApproved || isAdmin) && to.path === "/not-approved") {
             return next("/home");
           }

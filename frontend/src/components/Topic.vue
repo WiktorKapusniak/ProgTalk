@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount, reactive } from "vue";
+import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount, reactive, BaseTransition } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRoute, RouterLink } from "vue-router";
@@ -15,7 +15,7 @@ import Pagination from "./Pagination.vue";
 import type PaginationProps from "@/interfaces/Pagination";
 const toast = useToast();
 const route = useRoute();
-const { username, userId, loadUsername } = useAuth();
+const { username, userId, isAdmin, loadUsername } = useAuth();
 
 const currentTopic = ref<Topic>({} as Topic);
 const subTopics = ref<Topic[]>([]);
@@ -23,6 +23,9 @@ const posts = ref<Post[]>([]);
 const mainPosts = ref<Post[]>([]);
 const repliesMap = ref<Record<string, Post[]>>({});
 const hoveredPostId = ref<string | null>(null);
+const banHoveredTopicId = ref<string | null>(null);
+const banHoveredPostId = ref<string | null>(null);
+
 let subtopicHandlers: ReturnType<typeof useSubtopicSocket> | null = null;
 
 interface BreadcrumbItem {
@@ -129,8 +132,70 @@ const UnblockFromTopicAndAllSubtopics = async (unblockedUsername: string) => {
     toast.error(`Nie udało się odblokować użytkownika. ${(error as any).response?.data?.message || ""}`);
   }
 };
-const deleteTopic = async (topicId: string) => {};
-
+const hideTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz schować ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/hide`);
+    toast.success("Temat został schowany");
+    await fetchTopicData();
+  } catch (error) {
+    toast.error("Nie udało się schować tematu");
+  }
+};
+const unhideTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz odkryć ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/unhide`);
+    toast.success("Temat został odkryty");
+    await fetchTopicData();
+  } catch (error) {
+    toast.error("Nie udało się odkryć tematu");
+  }
+};
+const closeTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz zamknąć ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/close`);
+    toast.success("Temat został zamknięty");
+    await fetchTopicData();
+  } catch (error) {
+    toast.error("Nie udało się zamknąć tematu");
+  }
+};
+const openTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz otworzyć ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/open`);
+    toast.success("Temat został otwarty");
+    await fetchTopicData();
+  } catch (error) {
+    toast.error("Nie udało się otworzyć tematu");
+  }
+};
+const ban = async (banUsername: string) => {
+  try {
+    await axios.post(`/api/admin/ban/${banUsername}`);
+    toast.success(`Użytkownik ${banUsername} został zbanowany.`);
+  } catch (error) {
+    toast.error(`Nie udało się zbanować użytkownika. ${(error as any).response?.data?.message || ""}`);
+  }
+};
+const unban = async (unbanUsername: string) => {
+  try {
+    await axios.post(`/api/admin/unban/${unbanUsername}`);
+    toast.success(`Użytkownik ${unbanUsername} został odbanowany.`);
+  } catch (error) {
+    toast.error(`Nie udało się odbanować użytkownika. ${(error as any).response?.data?.message || ""}`);
+  }
+};
 const highlightCode = () => {
   nextTick(() => {
     document.querySelectorAll("pre code").forEach((block) => {
@@ -277,19 +342,59 @@ watch(
         <p>Brak podtematów</p>
       </div>
       <ul v-else class="subtopic-list">
-        <li v-for="subtopic in subTopics" :key="subtopic._id" class="subtopic-item">
+        <li
+          v-for="subtopic in subTopics"
+          :key="subtopic._id"
+          class="subtopic-item"
+          @mouseleave="banHoveredTopicId = null"
+        >
           <RouterLink :to="`/topic/${subtopic._id}`" class="subtopic-link">
-            <i
-              v-if="username === subtopic.mainModerator.username"
-              class="pi pi-trash delete-icon"
-              @click.prevent="deleteTopic(subtopic._id)"
-            ></i>
+            <div v-if="subtopic.isClosed">
+              <i
+                v-if="isAdmin"
+                class="pi pi-lock locked-lock-icon"
+                title="Temat jest zamknięty"
+                @click.prevent="openTopic(subtopic._id)"
+              ></i>
+            </div>
+            <div v-else>
+              <i
+                v-if="isAdmin"
+                class="pi pi-lock-open lock-icon"
+                title="Temat jest otwarty"
+                @click.prevent="closeTopic(subtopic._id)"
+              ></i>
+            </div>
+            <div v-if="subtopic.isClosed && !isAdmin">
+              <i class="pi pi-lock user-lock-icon" title="Temat jest zamknięty"></i>
+            </div>
+            <div v-if="!subtopic.isHidden">
+              <i v-if="isAdmin" class="pi pi-eye hide-icon" @click.prevent="hideTopic(subtopic._id)"></i>
+            </div>
+            <div v-else>
+              <i
+                class="pi pi-eye-slash hidden-hide-icon"
+                title="Temat jest ukryty"
+                @click.prevent="unhideTopic(subtopic._id)"
+              ></i>
+            </div>
             <div class="subtopic-header">
               <h2 class="subtopic-title">{{ subtopic.title }}</h2>
             </div>
             <p class="subtopic-description">{{ subtopic.description }}</p>
-            <div class="subtopic-meta">
-              <a class="moderator">{{ subtopic.mainModerator.username }}</a>
+            <div class="topic-meta">
+              <span class="moderator moderator-wrapper" @mouseenter="banHoveredTopicId = subtopic._id">
+                {{ subtopic.mainModerator.username }}
+
+                <div
+                  v-if="isAdmin && banHoveredTopicId === subtopic._id && subtopic.mainModerator.username !== username"
+                  class="moderator-actions-box"
+                >
+                  <button class="moderator-action-btn" @click.prevent="ban(subtopic.mainModerator.username)">
+                    Zbanuj
+                  </button>
+                </div>
+              </span>
             </div>
           </RouterLink>
         </li>
@@ -309,11 +414,31 @@ watch(
         <p>Brak postów. Bądź pierwszy!</p>
       </div>
       <ul v-else class="posts-list">
-        <li v-for="post in mainPosts" :key="post._id" @mouseleave="hoveredPostId = null">
-          <div class="post-item">
+        <li v-for="post in mainPosts" :key="post._id">
+          <div
+            class="post-item"
+            @mouseleave="
+              hoveredPostId = null;
+              banHoveredPostId = null;
+            "
+          >
             <div class="post-header">
-              <span class="post-author" @mouseenter="hoveredPostId = post._id">
+              <span
+                class="post-author moderator-wrapper"
+                @mouseenter="
+                  hoveredPostId = post._id;
+                  banHoveredPostId = post._id;
+                "
+              >
                 @{{ post.author.username }}
+
+                <div
+                  v-if="isAdmin && banHoveredPostId === post._id && post.author.username !== username"
+                  class="moderator-actions-box"
+                >
+                  <button class="moderator-action-btn" @click.prevent="ban(post.author.username)">Zbanuj</button>
+                </div>
+
                 <div
                   v-if="hoveredPostId === post._id && isModerator && post.author.username !== username"
                   class="nick-box"
@@ -332,6 +457,7 @@ watch(
                   </button>
                 </div>
               </span>
+
               <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
             </div>
             <div class="post-content">{{ post.content }}</div>
@@ -377,11 +503,28 @@ watch(
               :key="reply._id"
               class="post-item"
               id="reply-post"
-              @mouseleave="hoveredPostId = null"
+              @mouseleave="
+                hoveredPostId = null;
+                banHoveredPostId = null;
+              "
             >
               <div class="post-header">
-                <span class="post-author" @mouseenter="hoveredPostId = reply._id">
+                <span
+                  class="post-author moderator-wrapper"
+                  @mouseenter="
+                    hoveredPostId = reply._id;
+                    banHoveredPostId = reply._id;
+                  "
+                >
                   @{{ reply.author.username }}
+
+                  <div
+                    v-if="isAdmin && banHoveredPostId === reply._id && reply.author.username !== username"
+                    class="moderator-actions-box"
+                  >
+                    <button class="moderator-action-btn" @click.prevent="ban(reply.author.username)">Zbanuj</button>
+                  </div>
+
                   <div
                     v-if="hoveredPostId === reply._id && isModerator && reply.author.username !== username"
                     class="nick-box"
@@ -400,12 +543,11 @@ watch(
                     </button>
                   </div>
                 </span>
+
                 <span class="post-date">{{ new Date(reply.createdAt).toLocaleDateString() }}</span>
               </div>
               <div class="post-content">{{ reply.content }}</div>
-              <div v-if="reply.tags && reply.tags.length" class="post-tags">
-                <span v-for="tag in reply.tags" :key="tag" class="post-tag">#{{ tag }}</span>
-              </div>
+
               <pre v-if="reply.code" class="post-code"><code>{{ reply.code }}</code></pre>
 
               <div v-if="reply.tags && reply.tags.length" class="post-footer">
@@ -590,11 +732,11 @@ watch(
   font-size: $font-size-base * 0.9;
 }
 
-.delete-icon {
+.hide-icon {
   position: absolute;
   top: $padding-sm;
   right: $padding-md;
-  color: #e74c3c;
+  // color: #e74c3c;
   cursor: pointer;
   font-size: 1.3rem;
   transition: color 0.2s;
@@ -603,7 +745,17 @@ watch(
     color: #c0392b;
   }
 }
-
+.hidden-hide-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md;
+  cursor: pointer;
+  font-size: 1.3rem;
+  color: rgb(190, 0, 0);
+  &:hover {
+    color: #2980b9;
+  }
+}
 .posts-section {
   margin-bottom: $margin-lg;
 }
@@ -645,6 +797,7 @@ watch(
     .post-author {
       color: $primary-lighter;
       font-weight: 600;
+      cursor: pointer;
       .nick-box {
         position: absolute;
         background: $background-dark;
@@ -739,5 +892,67 @@ watch(
   font-weight: 500;
   border: 1px solid $primary-color;
   letter-spacing: 0.02em;
+}
+.lock-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md * 3.5;
+  cursor: pointer;
+  font-size: 1.3rem;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #2980b9;
+  }
+}
+.locked-lock-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md * 3.5;
+  font-size: 1.3rem;
+  color: rgb(190, 0, 0);
+  &:hover {
+    color: #2980b9;
+  }
+}
+.user-lock-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md * 3.5;
+  font-size: 1.3rem;
+  color: rgb(190, 0, 0);
+}
+.moderator-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.moderator-actions-box {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 10px;
+
+  background: $background-dark;
+  border: 1px solid $border-dark;
+  border-radius: $border-radius;
+  padding: 6px 10px;
+  box-shadow: $box-shadow;
+  z-index: 20;
+}
+
+.moderator-action-btn {
+  background: transparent;
+  border: none;
+  color: #e74c3c;
+  font-weight: 600;
+  font-size: $font-size-base * 0.9;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    color: lighten(#e74c3c, 10%);
+  }
 }
 </style>

@@ -9,14 +9,16 @@ const toast = useToast();
 
 const username = ref();
 const password = ref();
-
+const refresh = () => {
+  window.location.reload();
+  toast.success("Login successful!");
+};
 const handleSubmit = async () => {
   try {
     const response = await axios.post("/api/auth/login", {
       username: username.value,
       password: password.value,
     });
-
     localStorage.setItem("token", response.data.token);
     localStorage.setItem("userId", response.data.userId);
     if (!localStorage.getItem("topicsPerPage")) {
@@ -25,8 +27,8 @@ const handleSubmit = async () => {
     if (!localStorage.getItem("currentPage")) {
       localStorage.setItem("currentPage", "1");
     }
-    toast.success("Login successful!");
     router.push("/home");
+    refresh();
   } catch (err) {
     console.error(err);
     const message = err.response?.data?.message || "Login failed. Please check your credentials.";

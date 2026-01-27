@@ -12,8 +12,9 @@ import { useTopicSocket } from "@/composables/socket/topicSocket";
 import { onBeforeUnmount } from "vue";
 
 const toast = useToast();
-const { username, loadUsername } = useAuth();
+const { isAdmin, loadUsername, username } = useAuth();
 const { subscribeToTopics, unsubscribeFromTopics, onNewTopic, offNewTopic } = useTopicSocket();
+const hoveredTopicId = ref<string | null>(null);
 
 const topics = ref<Topic[]>([]);
 
@@ -64,19 +65,65 @@ const handleLimitChange = async (newLimit: number) => {
   }
 };
 
-const deleteTopic = async (topicId: string) => {
-  if (!confirm("Czy na pewno chcesz usunąć ten temat?")) {
+const hideTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz schować ten temat?")) {
     return;
   }
-
   try {
-    await axios.delete(`/api/topics/${topicId}`);
-    toast.success("Temat został usunięty");
+    await axios.post(`/api/topics/${topicId}/hide`);
+    toast.success("Temat został schowany");
     await handlePageChange(pagination.page);
   } catch (error) {
-    toast.error("Nie udało się usunąć tematu");
+    toast.error("Nie udało się schować tematu");
   }
 };
+const unhideTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz odkryć ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/unhide`);
+    toast.success("Temat został odkryty");
+    await handlePageChange(pagination.page);
+  } catch (error) {
+    toast.error("Nie udało się odkryć tematu");
+  }
+};
+const closeTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz zamknąć ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/close`);
+    toast.success("Temat został zamknięty");
+    await handlePageChange(pagination.page);
+  } catch (error) {
+    toast.error("Nie udało się zamknąć tematu");
+  }
+};
+const openTopic = async (topicId: string) => {
+  if (!confirm("Czy na pewno chcesz otworzyć ten temat?")) {
+    return;
+  }
+  try {
+    await axios.post(`/api/topics/${topicId}/open`);
+    toast.success("Temat został otwarty");
+    await handlePageChange(pagination.page);
+  } catch (error) {
+    toast.error("Nie udało się otworzyć tematu");
+  }
+};
+const ban = async (banUsername: string) => {
+  if (!confirm(`Czy na pewno chcesz zbanować użytkownika ${banUsername}?`)) return;
+
+  try {
+    await axios.post(`/api/admin/ban/${banUsername}`);
+    toast.success(`Użytkownik ${banUsername} został zbanowany.`);
+  } catch (error: any) {
+    toast.error(`Nie udało się zbanować użytkownika. ${error?.response?.data?.message || ""}`);
+  }
+};
+
 const HandleNewTopic = (data: { newTopic: Topic }) => {
   topics.value.unshift(data.newTopic);
   pagination.total += 1;
@@ -122,19 +169,54 @@ onBeforeUnmount(() => {
         <p>Brak dostępnych tematów</p>
       </div>
       <ul v-else class="topic-list">
-        <li v-for="topic in topics" :key="topic._id" class="topic-item">
+        <li v-for="topic in topics" :key="topic._id" class="topic-item" @mouseleave="hoveredTopicId = null">
           <RouterLink :to="`/topic/${topic._id}`" class="topic-link">
-            <i
-              v-if="username === topic.mainModerator.username"
-              class="pi pi-trash delete-icon"
-              @click.prevent="deleteTopic(topic._id)"
-            ></i>
+            <div v-if="topic.isClosed">
+              <i
+                v-if="isAdmin"
+                class="pi pi-lock locked-lock-icon"
+                title="Temat jest zamknięty"
+                @click.prevent="openTopic(topic._id)"
+              ></i>
+            </div>
+            <div v-else>
+              <i
+                v-if="isAdmin"
+                class="pi pi-lock-open lock-icon"
+                title="Temat jest otwarty"
+                @click.prevent="closeTopic(topic._id)"
+              ></i>
+            </div>
+            <div v-if="topic.isClosed && !isAdmin">
+              <i class="pi pi-lock user-lock-icon" title="Temat jest zamknięty"></i>
+            </div>
+            <div v-if="!topic.isHidden">
+              <i v-if="isAdmin" class="pi pi-eye hide-icon" @click.prevent="hideTopic(topic._id)"></i>
+            </div>
+            <div v-else>
+              <i
+                class="pi pi-eye-slash hidden-hide-icon"
+                title="Temat jest ukryty"
+                @click.prevent="unhideTopic(topic._id)"
+              ></i>
+            </div>
             <div class="topic-header">
               <h2 class="topic-title">{{ topic.title }}</h2>
             </div>
             <p class="topic-description">{{ topic.description }}</p>
             <div class="topic-meta">
-              <a class="moderator">{{ topic.mainModerator.username }}</a>
+              <span class="moderator moderator-wrapper" @mouseenter="hoveredTopicId = topic._id">
+                {{ topic.mainModerator.username }}
+
+                <div
+                  v-if="isAdmin && hoveredTopicId === topic._id && topic.mainModerator.username !== username"
+                  class="moderator-actions-box"
+                >
+                  <button class="moderator-action-btn" @click.prevent="ban(topic.mainModerator.username)">
+                    Zbanuj
+                  </button>
+                </div>
+              </span>
             </div>
           </RouterLink>
         </li>
@@ -263,17 +345,91 @@ onBeforeUnmount(() => {
   font-size: $font-size-base * 0.9;
 }
 
-.delete-icon {
+.hide-icon {
   position: absolute;
   top: $padding-sm;
   right: $padding-md;
-  color: #e74c3c;
+  // color: #e74c3c;
   cursor: pointer;
   font-size: 1.3rem;
   transition: color 0.2s;
 
   &:hover {
     color: #c0392b;
+  }
+}
+.hidden-hide-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md;
+  cursor: pointer;
+  font-size: 1.3rem;
+  color: rgb(190, 0, 0);
+  &:hover {
+    color: #2980b9;
+  }
+}
+.lock-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md * 3.5;
+  cursor: pointer;
+  font-size: 1.3rem;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #2980b9;
+  }
+}
+.locked-lock-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md * 3.5;
+  font-size: 1.3rem;
+  color: rgb(190, 0, 0);
+  &:hover {
+    color: #2980b9;
+  }
+}
+.user-lock-icon {
+  position: absolute;
+  top: $padding-sm;
+  right: $padding-md * 3.5;
+  font-size: 1.3rem;
+  color: rgb(190, 0, 0);
+}
+.moderator-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.moderator-actions-box {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 10px;
+
+  background: $background-dark;
+  border: 1px solid $border-dark;
+  border-radius: $border-radius;
+  padding: 6px 10px;
+  box-shadow: $box-shadow;
+  z-index: 20;
+}
+
+.moderator-action-btn {
+  background: transparent;
+  border: none;
+  color: #e74c3c;
+  font-weight: 600;
+  font-size: $font-size-base * 0.9;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    color: lighten(#e74c3c, 10%);
   }
 }
 </style>

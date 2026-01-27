@@ -358,4 +358,26 @@ router.post("/:id/unhide", loadTopic, isAdmin, async (req, res) => {
   }
 });
 
+// GET /api/topics/:id/blocked-users
+router.get("/:id/blocked-users", loadTopic, isModerator, async (req, res) => {
+  try {
+    const topic = await Topic.findById(req.params.id).populate("blockedUsers.user", "username");
+
+    if (topic.mainModerator.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Only main moderator can view blocked users" });
+    }
+
+    res.json(
+      topic.blockedUsers.map((b) => ({
+        _id: b.user._id,
+        username: b.user.username,
+        blockedAt: b.blockedAt,
+      })),
+    );
+  } catch (err) {
+    console.error("GET blocked users error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;

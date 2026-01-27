@@ -14,7 +14,6 @@ router.get("/topics/:topicId/posts", loadTopic, async (req, res) => {
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
 
-    //tylko posty głowne
     const posts = await Post.find({ topic: topic._id, deleted: false, reference: null })
       .populate("author", "username")
       .skip(skip)

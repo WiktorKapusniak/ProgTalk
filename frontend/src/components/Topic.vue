@@ -25,6 +25,7 @@ const repliesMap = ref<Record<string, Post[]>>({});
 const hoveredPostId = ref<string | null>(null);
 const banHoveredTopicId = ref<string | null>(null);
 const banHoveredPostId = ref<string | null>(null);
+const blockedUsers = ref<{ _id: string; username: string; blockedAt: string }[]>([]);
 
 let subtopicHandlers: ReturnType<typeof useSubtopicSocket> | null = null;
 
@@ -117,6 +118,7 @@ const BlockFromTopicAndAllSubtopics = async (blockedUsername: string) => {
     await axios.post(`/api/topics/${currentTopic.value._id}/block-user`, {
       username: blockedUsername,
     });
+    fetchBlockedUsers();
     toast.success(`Użytkownik ${blockedUsername} został zablokowany w tym temacie i wszystkich podtematach.`);
   } catch (error) {
     toast.error(`Nie udało się zablokować użytkownika. ${(error as any).response?.data?.message || ""}`);
@@ -127,6 +129,7 @@ const UnblockFromTopicAndAllSubtopics = async (unblockedUsername: string) => {
     await axios.post(`/api/topics/${currentTopic.value._id}/unblock-user`, {
       username: unblockedUsername,
     });
+    fetchBlockedUsers();
     toast.success(`Użytkownik ${unblockedUsername} został odblokowany w tym temacie i wszystkich podtematach.`);
   } catch (error) {
     toast.error(`Nie udało się odblokować użytkownika. ${(error as any).response?.data?.message || ""}`);
@@ -247,9 +250,20 @@ const fetchMainPosts = async (page = 1, limit = 10) => {
     toast.error("Failed to load posts.");
   }
 };
+const fetchBlockedUsers = async () => {
+  try {
+    if (currentTopic.value.mainModerator?.username !== username.value) return;
+
+    const res = await axios.get(`/api/topics/${currentTopic.value._id}/blocked-users`);
+    blockedUsers.value = res.data;
+  } catch (err) {
+    console.error(err);
+  }
+};
 onMounted(async () => {
   await loadUsername();
   await fetchTopicData();
+  fetchBlockedUsers();
   subtopicHandlers = useSubtopicSocket(currentTopic.value._id);
   subtopicHandlers.subscribeToSubtopic();
   subtopicHandlers.onNewSubtopic(async (data: { newSubtopic: Topic }) => {
@@ -314,195 +328,110 @@ watch(
 </script>
 
 <template>
-  <div class="topic-view">
-    <Breadcrumbs :breadcrumbs="breadcrumbs" />
-    <section class="topic-header">
-      <h1 class="topic-title">{{ currentTopic.title }}</h1>
-      <p class="topic-description">{{ currentTopic.description }}</p>
-      <div class="topic-meta">
-        <span class="moderator">{{ currentTopic.mainModerator?.username }}</span>
-      </div>
-    </section>
+  <div class="topic-layout">
+    <div class="topic-view">
+      <Breadcrumbs :breadcrumbs="breadcrumbs" />
+      <section class="topic-header">
+        <h1 class="topic-title">{{ currentTopic.title }}</h1>
+        <p class="topic-description">{{ currentTopic.description }}</p>
+        <div class="topic-meta">
+          <span class="moderator">{{ currentTopic.mainModerator?.username }}</span>
+        </div>
+      </section>
 
-    <section class="subtopics-section">
-      <div class="section-header">
-        <h2>Podtematy</h2>
-        <RouterLink
-          v-if="isModerator"
-          :to="`/topic/${currentTopic._id}/create-subtopic`"
-          class="add-button"
-          title="Dodaj podtemat"
-        >
-          <i class="pi pi-plus"></i>
-          <span>Dodaj podtemat</span>
-        </RouterLink>
-      </div>
-
-      <div v-if="subTopics.length === 0" class="empty-state">
-        <p>Brak podtematów</p>
-      </div>
-      <ul v-else class="subtopic-list">
-        <li
-          v-for="subtopic in subTopics"
-          :key="subtopic._id"
-          class="subtopic-item"
-          @mouseleave="banHoveredTopicId = null"
-        >
-          <RouterLink :to="`/topic/${subtopic._id}`" class="subtopic-link">
-            <div v-if="subtopic.isClosed">
-              <i
-                v-if="isAdmin"
-                class="pi pi-lock locked-lock-icon"
-                title="Temat jest zamknięty"
-                @click.prevent="openTopic(subtopic._id)"
-              ></i>
-            </div>
-            <div v-else>
-              <i
-                v-if="isAdmin"
-                class="pi pi-lock-open lock-icon"
-                title="Temat jest otwarty"
-                @click.prevent="closeTopic(subtopic._id)"
-              ></i>
-            </div>
-            <div v-if="subtopic.isClosed && !isAdmin">
-              <i class="pi pi-lock user-lock-icon" title="Temat jest zamknięty"></i>
-            </div>
-            <div v-if="!subtopic.isHidden">
-              <i v-if="isAdmin" class="pi pi-eye hide-icon" @click.prevent="hideTopic(subtopic._id)"></i>
-            </div>
-            <div v-else>
-              <i
-                class="pi pi-eye-slash hidden-hide-icon"
-                title="Temat jest ukryty"
-                @click.prevent="unhideTopic(subtopic._id)"
-              ></i>
-            </div>
-            <div class="subtopic-header">
-              <h2 class="subtopic-title">{{ subtopic.title }}</h2>
-            </div>
-            <p class="subtopic-description">{{ subtopic.description }}</p>
-            <div class="topic-meta">
-              <span class="moderator moderator-wrapper" @mouseenter="banHoveredTopicId = subtopic._id">
-                {{ subtopic.mainModerator.username }}
-
-                <div
-                  v-if="isAdmin && banHoveredTopicId === subtopic._id && subtopic.mainModerator.username !== username"
-                  class="moderator-actions-box"
-                >
-                  <button class="moderator-action-btn" @click.prevent="ban(subtopic.mainModerator.username)">
-                    Zbanuj
-                  </button>
-                </div>
-              </span>
-            </div>
-          </RouterLink>
-        </li>
-      </ul>
-    </section>
-
-    <section class="posts-section">
-      <div class="section-header">
-        <h2>Posty</h2>
-        <RouterLink :to="`/topic/${currentTopic._id}/create-post`" class="add-button" title="Dodaj post">
-          <i class="pi pi-plus"></i>
-          <span>Dodaj post</span>
-        </RouterLink>
-      </div>
-
-      <div v-if="posts.length === 0" class="empty-state">
-        <p>Brak postów. Bądź pierwszy!</p>
-      </div>
-      <ul v-else class="posts-list">
-        <li v-for="post in mainPosts" :key="post._id">
-          <div
-            class="post-item"
-            @mouseleave="
-              hoveredPostId = null;
-              banHoveredPostId = null;
-            "
+      <section class="subtopics-section">
+        <div class="section-header">
+          <h2>Podtematy</h2>
+          <RouterLink
+            v-if="isModerator"
+            :to="`/topic/${currentTopic._id}/create-subtopic`"
+            class="add-button"
+            title="Dodaj podtemat"
           >
-            <div class="post-header">
-              <span
-                class="post-author moderator-wrapper"
-                @mouseenter="
-                  hoveredPostId = post._id;
-                  banHoveredPostId = post._id;
-                "
-              >
-                @{{ post.author.username }}
+            <i class="pi pi-plus"></i>
+            <span>Dodaj podtemat</span>
+          </RouterLink>
+        </div>
 
-                <div
-                  v-if="isAdmin && banHoveredPostId === post._id && post.author.username !== username"
-                  class="moderator-actions-box"
-                >
-                  <button class="moderator-action-btn" @click.prevent="ban(post.author.username)">Zbanuj</button>
-                </div>
-
-                <div
-                  v-if="hoveredPostId === post._id && isModerator && post.author.username !== username"
-                  class="nick-box"
-                >
-                  <button @click="addModerator(post.author.username)" class="nick-box-button">
-                    Mianuj moderatorem
-                  </button>
-                  <button @click="deleteModerator(post.author.username)" class="nick-box-button">
-                    Zabierz moderatora
-                  </button>
-                  <button @click="BlockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
-                    Zablokuj
-                  </button>
-                  <button @click="UnblockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
-                    Odblokuj
-                  </button>
-                </div>
-              </span>
-
-              <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
-            </div>
-            <div class="post-content">{{ post.content }}</div>
-
-            <pre v-if="post.code" class="post-code"><code>{{ post.code }}</code></pre>
-            <div class="post-footer" v-if="post.tags && post.tags.length">
-              <div v-if="post.tags && post.tags.length" class="post-tags">
-                <span v-for="tag in post.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+        <div v-if="subTopics.length === 0" class="empty-state">
+          <p>Brak podtematów</p>
+        </div>
+        <ul v-else class="subtopic-list">
+          <li
+            v-for="subtopic in subTopics"
+            :key="subtopic._id"
+            class="subtopic-item"
+            @mouseleave="banHoveredTopicId = null"
+          >
+            <RouterLink :to="`/topic/${subtopic._id}`" class="subtopic-link">
+              <div v-if="subtopic.isClosed">
+                <i
+                  v-if="isAdmin"
+                  class="pi pi-lock locked-lock-icon"
+                  title="Temat jest zamknięty"
+                  @click.prevent="openTopic(subtopic._id)"
+                ></i>
               </div>
-              <div>
-                <button @click.prevent="handleLikePost(post)" class="like-button">
-                  <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-                  {{ post.likes.length }}
-                </button>
-                <RouterLink
-                  :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
-                  class="like-button"
-                  title="Odpowiedz na post"
-                >
-                  <i class="pi pi-reply"></i>
-                </RouterLink>
+              <div v-else>
+                <i
+                  v-if="isAdmin"
+                  class="pi pi-lock-open lock-icon"
+                  title="Temat jest otwarty"
+                  @click.prevent="closeTopic(subtopic._id)"
+                ></i>
               </div>
-            </div>
-            <div v-else class="post-footer-empty-tags">
-              <div>
-                <button @click.prevent="handleLikePost(post)" class="like-button">
-                  <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-                  {{ post.likes.length }}
-                </button>
-                <RouterLink
-                  :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
-                  class="like-button"
-                  title="Odpowiedz na post"
-                >
-                  <i class="pi pi-reply"></i>
-                </RouterLink>
+              <div v-if="subtopic.isClosed && !isAdmin">
+                <i class="pi pi-lock user-lock-icon" title="Temat jest zamknięty"></i>
               </div>
-            </div>
-          </div>
-          <ul v-if="repliesMap[post._id] && repliesMap[post._id]!.length > 0" class="posts-list">
-            <li
-              v-for="reply in repliesMap[post._id]"
-              :key="reply._id"
+              <div v-if="!subtopic.isHidden">
+                <i v-if="isAdmin" class="pi pi-eye hide-icon" @click.prevent="hideTopic(subtopic._id)"></i>
+              </div>
+              <div v-else>
+                <i
+                  class="pi pi-eye-slash hidden-hide-icon"
+                  title="Temat jest ukryty"
+                  @click.prevent="unhideTopic(subtopic._id)"
+                ></i>
+              </div>
+              <div class="subtopic-header">
+                <h2 class="subtopic-title">{{ subtopic.title }}</h2>
+              </div>
+              <p class="subtopic-description">{{ subtopic.description }}</p>
+              <div class="topic-meta">
+                <span class="moderator moderator-wrapper" @mouseenter="banHoveredTopicId = subtopic._id">
+                  {{ subtopic.mainModerator.username }}
+
+                  <div
+                    v-if="isAdmin && banHoveredTopicId === subtopic._id && subtopic.mainModerator.username !== username"
+                    class="moderator-actions-box"
+                  >
+                    <button class="moderator-action-btn" @click.prevent="ban(subtopic.mainModerator.username)">
+                      Zbanuj
+                    </button>
+                  </div>
+                </span>
+              </div>
+            </RouterLink>
+          </li>
+        </ul>
+      </section>
+
+      <section class="posts-section">
+        <div class="section-header">
+          <h2>Posty</h2>
+          <RouterLink :to="`/topic/${currentTopic._id}/create-post`" class="add-button" title="Dodaj post">
+            <i class="pi pi-plus"></i>
+            <span>Dodaj post</span>
+          </RouterLink>
+        </div>
+
+        <div v-if="posts.length === 0" class="empty-state">
+          <p>Brak postów. Bądź pierwszy!</p>
+        </div>
+        <ul v-else class="posts-list">
+          <li v-for="post in mainPosts" :key="post._id">
+            <div
               class="post-item"
-              id="reply-post"
               @mouseleave="
                 hoveredPostId = null;
                 banHoveredPostId = null;
@@ -512,53 +441,59 @@ watch(
                 <span
                   class="post-author moderator-wrapper"
                   @mouseenter="
-                    hoveredPostId = reply._id;
-                    banHoveredPostId = reply._id;
+                    hoveredPostId = post._id;
+                    banHoveredPostId = post._id;
                   "
                 >
-                  @{{ reply.author.username }}
+                  @{{ post.author.username }}
 
                   <div
-                    v-if="isAdmin && banHoveredPostId === reply._id && reply.author.username !== username"
+                    v-if="isAdmin && banHoveredPostId === post._id && post.author.username !== username"
                     class="moderator-actions-box"
                   >
-                    <button class="moderator-action-btn" @click.prevent="ban(reply.author.username)">Zbanuj</button>
+                    <button class="moderator-action-btn" @click.prevent="ban(post.author.username)">Zbanuj</button>
                   </div>
 
                   <div
-                    v-if="hoveredPostId === reply._id && isModerator && reply.author.username !== username"
+                    v-if="hoveredPostId === post._id && isModerator && post.author.username !== username"
                     class="nick-box"
                   >
-                    <button @click="addModerator(reply.author.username)" class="nick-box-button">
+                    <button @click="addModerator(post.author.username)" class="nick-box-button">
                       Mianuj moderatorem
                     </button>
-                    <button @click="deleteModerator(reply.author.username)" class="nick-box-button">
+                    <button @click="deleteModerator(post.author.username)" class="nick-box-button">
                       Zabierz moderatora
                     </button>
-                    <button @click="BlockFromTopicAndAllSubtopics(reply.author.username)" class="nick-box-button">
+                    <button @click="BlockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
                       Zablokuj
                     </button>
-                    <button @click="UnblockFromTopicAndAllSubtopics(reply.author.username)" class="nick-box-button">
+                    <button @click="UnblockFromTopicAndAllSubtopics(post.author.username)" class="nick-box-button">
                       Odblokuj
                     </button>
                   </div>
                 </span>
 
-                <span class="post-date">{{ new Date(reply.createdAt).toLocaleDateString() }}</span>
+                <span class="post-date">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
               </div>
-              <div class="post-content">{{ reply.content }}</div>
+              <div class="post-content">{{ post.content }}</div>
 
-              <pre v-if="reply.code" class="post-code"><code>{{ reply.code }}</code></pre>
-
-              <div v-if="reply.tags && reply.tags.length" class="post-footer">
-                <div v-if="reply.tags && reply.tags.length" class="post-tags">
-                  <span v-for="tag in reply.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+              <pre v-if="post.code" class="post-code"><code>{{ post.code }}</code></pre>
+              <div class="post-footer" v-if="post.tags && post.tags.length">
+                <div v-if="post.tags && post.tags.length" class="post-tags">
+                  <span v-for="tag in post.tags" :key="tag" class="post-tag">#{{ tag }}</span>
                 </div>
                 <div>
-                  <button @click.prevent="handleLikePost(reply)" class="like-button">
-                    <i :class="isLiked(reply) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-                    {{ reply.likes.length }}
+                  <button @click.prevent="handleLikePost(post)" class="like-button">
+                    <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                    {{ post.likes.length }}
                   </button>
+                  <RouterLink
+                    :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
+                    class="like-button"
+                    title="Odpowiedz na post"
+                  >
+                    <i class="pi pi-reply"></i>
+                  </RouterLink>
                 </div>
               </div>
               <div v-else class="post-footer-empty-tags">
@@ -567,21 +502,117 @@ watch(
                     <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
                     {{ post.likes.length }}
                   </button>
+                  <RouterLink
+                    :to="`/topic/${currentTopic._id}/create-post/${post._id}`"
+                    class="like-button"
+                    title="Odpowiedz na post"
+                  >
+                    <i class="pi pi-reply"></i>
+                  </RouterLink>
                 </div>
               </div>
-            </li>
-          </ul>
-        </li>
-      </ul>
-      <Pagination
-        :page="pagination.page"
-        :limit="pagination.limit"
-        :total="pagination.total"
-        :totalPages="pagination.totalPages"
-        @page-changed="handlePageChange"
-        @limit-changed="handleLimitChange"
-      />
-    </section>
+            </div>
+            <ul v-if="repliesMap[post._id] && repliesMap[post._id]!.length > 0" class="posts-list">
+              <li
+                v-for="reply in repliesMap[post._id]"
+                :key="reply._id"
+                class="post-item"
+                id="reply-post"
+                @mouseleave="
+                  hoveredPostId = null;
+                  banHoveredPostId = null;
+                "
+              >
+                <div class="post-header">
+                  <span
+                    class="post-author moderator-wrapper"
+                    @mouseenter="
+                      hoveredPostId = reply._id;
+                      banHoveredPostId = reply._id;
+                    "
+                  >
+                    @{{ reply.author.username }}
+
+                    <div
+                      v-if="isAdmin && banHoveredPostId === reply._id && reply.author.username !== username"
+                      class="moderator-actions-box"
+                    >
+                      <button class="moderator-action-btn" @click.prevent="ban(reply.author.username)">Zbanuj</button>
+                    </div>
+
+                    <div
+                      v-if="hoveredPostId === reply._id && isModerator && reply.author.username !== username"
+                      class="nick-box"
+                    >
+                      <button @click="addModerator(reply.author.username)" class="nick-box-button">
+                        Mianuj moderatorem
+                      </button>
+                      <button @click="deleteModerator(reply.author.username)" class="nick-box-button">
+                        Zabierz moderatora
+                      </button>
+                      <button @click="BlockFromTopicAndAllSubtopics(reply.author.username)" class="nick-box-button">
+                        Zablokuj
+                      </button>
+                      <button @click="UnblockFromTopicAndAllSubtopics(reply.author.username)" class="nick-box-button">
+                        Odblokuj
+                      </button>
+                    </div>
+                  </span>
+
+                  <span class="post-date">{{ new Date(reply.createdAt).toLocaleDateString() }}</span>
+                </div>
+                <div class="post-content">{{ reply.content }}</div>
+
+                <pre v-if="reply.code" class="post-code"><code>{{ reply.code }}</code></pre>
+
+                <div v-if="reply.tags && reply.tags.length" class="post-footer">
+                  <div v-if="reply.tags && reply.tags.length" class="post-tags">
+                    <span v-for="tag in reply.tags" :key="tag" class="post-tag">#{{ tag }}</span>
+                  </div>
+                  <div>
+                    <button @click.prevent="handleLikePost(reply)" class="like-button">
+                      <i :class="isLiked(reply) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                      {{ reply.likes.length }}
+                    </button>
+                  </div>
+                </div>
+                <div v-else class="post-footer-empty-tags">
+                  <div>
+                    <button @click.prevent="handleLikePost(post)" class="like-button">
+                      <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
+                      {{ post.likes.length }}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </li>
+        </ul>
+        <Pagination
+          :page="pagination.page"
+          :limit="pagination.limit"
+          :total="pagination.total"
+          :totalPages="pagination.totalPages"
+          @page-changed="handlePageChange"
+          @limit-changed="handleLimitChange"
+        />
+      </section>
+      <aside v-if="currentTopic.mainModerator?.username === username" class="blocked-users-panel">
+        <h3>Zablokowani użytkownicy</h3>
+
+        <p v-if="blockedUsers.length === 0" class="empty">Brak zablokowanych użytkowników</p>
+
+        <ul v-else>
+          <li v-for="user in blockedUsers" :key="user._id">
+            <div class="user-row">
+              <span class="username">@{{ user.username }}</span>
+              <button @click="UnblockFromTopicAndAllSubtopics(user.username)">Odblokuj</button>
+            </div>
+            <small>{{ new Date(user.blockedAt).toLocaleDateString() }}</small>
+          </li>
+        </ul>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -953,6 +984,67 @@ watch(
 
   &:hover {
     color: lighten(#e74c3c, 10%);
+  }
+}
+.topic-layout {
+  display: flex;
+  gap: 2rem;
+}
+
+.blocked-users-panel {
+  width: 260px;
+  background: $background-dark;
+  border: 1px solid $border-dark;
+  border-radius: $border-radius;
+  padding: $padding-md;
+  height: fit-content;
+  position: absolute;
+  top: 100px;
+  right: 20px;
+
+  h3 {
+    margin-bottom: 1rem;
+    color: $text-white;
+    font-size: $font-size-base * 1.1;
+  }
+
+  .empty {
+    color: $text-light;
+    font-style: italic;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  li {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid $border-dark;
+  }
+
+  .user-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .username {
+      color: $primary-lighter;
+      font-weight: 600;
+    }
+
+    button {
+      background: transparent;
+      border: none;
+      color: $primary-color;
+      cursor: pointer;
+
+      &:hover {
+        color: lighten($primary-color, 10%);
+      }
+    }
   }
 }
 </style>

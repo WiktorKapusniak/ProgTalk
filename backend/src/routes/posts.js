@@ -114,6 +114,39 @@ router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (r
     res.status(500).json({ message: "Server error" });
   }
 });
+// PATCH /api/posts/:postId
+router.patch("/posts/:postId", async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { content, code, tags } = req.body;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (post.author.toString() !== req.user._id.toString() && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    post.content = content !== undefined ? content : post.content;
+    post.code = code !== undefined ? code : post.code;
+    post.tags = tags !== undefined ? tags : post.tags;
+
+    await post.save();
+
+    const io = req.app.get("io");
+    const populatedPost = await Post.findById(post._id).populate("author", "username");
+    io.to(`subtopic-${post.topic}`).emit("postUpdated", {
+      updatedPost: populatedPost,
+    });
+
+    res.json({ message: "Post updated successfully", post: populatedPost });
+  } catch (err) {
+    console.error("PATCH /posts/:postId error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // POST /api/topics/:topicId/posts/referencePost
 router.post("/topics/:topicId/posts/referencePost", loadTopic, checkIfBlockedInTopic, async (req, res) => {

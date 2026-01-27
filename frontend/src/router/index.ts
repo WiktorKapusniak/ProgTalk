@@ -45,6 +45,10 @@ const routes = [
         component: () => import("../views/CreatePostView.vue"),
       },
       {
+        path: "topic/:id/edit-post/:postId",
+        component: () => import("../views/CreatePostView.vue"),
+      },
+      {
         path: "topic/:id/create-post/:parentPostId",
         component: () => import("../views/CreatePostView.vue"),
       },
@@ -86,7 +90,6 @@ router.beforeEach(async (to, _from, next) => {
           },
         });
         if (response.status === 403) {
-          // Zbanowany lub brak uprawnień
           if (to.path !== "/banned") {
             return next("/banned");
           } else {

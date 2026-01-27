@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref, computed } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRouter, useRoute } from "vue-router";
@@ -8,8 +8,12 @@ const toast = useToast();
 const router = useRouter();
 const route = useRoute();
 
-const props = defineProps<{ parentPostId?: string }>();
-const parentPostId = props.parentPostId ?? (route.params.parentPostId as string | undefined);
+const postId = route.params.postId as string | undefined;
+const parentPostId = route.params.parentPostId as string | undefined;
+
+const isEditMode = computed(() => !!postId);
+const isReplyMode = computed(() => !!parentPostId && !postId);
+
 const parentPost = ref<any>(null);
 
 interface PostForm {
@@ -18,76 +22,117 @@ interface PostForm {
   tags?: string[];
   reference?: string;
 }
+
 const form: PostForm = reactive({
   content: "",
   code: "",
   tags: [],
   reference: undefined,
 });
+
 const tags = ref<string[]>([]);
 
+/* ===== INIT ===== */
 onMounted(async () => {
-  const response = await axios.get("/api/tags");
-  tags.value = response.data.tags.map((t: any) => t.name);
-  if (response.status !== 200) {
-    toast.error("Failed to load tags.");
+  try {
+    const tagsRes = await axios.get("/api/tags");
+    tags.value = tagsRes.data.tags.map((t: any) => t.name);
+  } catch {
+    toast.error("Nie udało się załadować tagów");
   }
-  if (parentPostId && parentPostId !== "null" && typeof parentPostId === "string") {
+
+  /* ===== EDYCJA ===== */
+  if (isEditMode.value && postId) {
     try {
-      const postResp = await axios.get(`/api/posts/${parentPostId}`);
-      parentPost.value = postResp.data.post;
+      const res = await axios.get(`/api/posts/${postId}`);
+      const post = res.data.post;
+
+      form.content = post.content;
+      form.code = post.code || "";
+      form.tags = Array.isArray(post.tags) ? post.tags : [];
+      form.reference = post.reference || undefined;
+
+      parentPost.value = null;
+      return;
+    } catch {
+      toast.error("Nie udało się załadować posta do edycji");
+      router.push(`/topic/${route.params.id}`);
+      return;
+    }
+  }
+
+  /* ===== ODPOWIEDŹ ===== */
+  if (isReplyMode.value && parentPostId) {
+    try {
+      const res = await axios.get(`/api/posts/${parentPostId}`);
+      parentPost.value = res.data.post;
       form.reference = parentPostId;
-    } catch (e) {
+    } catch {
       parentPost.value = null;
       form.reference = undefined;
     }
-  } else {
-    parentPost.value = null;
-    form.reference = undefined;
   }
 });
 
-const handleAddPost = async () => {
+/* ===== SUBMIT ===== */
+const handleSubmit = async () => {
   try {
-    const parentId = route.params.id as string;
+    const topicId = route.params.id as string;
 
-    const response = await axios.post(`/api/topics/${parentId}/posts`, {
+    /* ===== EDYTOWANIE ===== */
+    if (isEditMode.value && postId) {
+      await axios.patch(`/api/posts/${postId}`, {
+        content: form.content,
+        code: form.code,
+        tags: form.tags,
+      });
+
+      toast.success("Post został zaktualizowany");
+      router.push(`/topic/${topicId}`);
+      return;
+    }
+
+    /* ===== TWORZENIE / ODPOWIEDŹ ===== */
+    await axios.post(`/api/topics/${topicId}/posts`, {
       content: form.content,
       code: form.code,
       tags: form.tags,
       reference: form.reference,
     });
-    console.log(tags.value);
-    if (response.status === 201) {
-      toast.success("Post dodany pomyślnie!");
-      form.content = "";
-      form.code = "";
-      form.tags = [];
-      form.reference = undefined;
-      router.push(`/topic/${parentId}`);
-    }
-  } catch (error) {
-    toast.error("Failed to add post. Please try again.");
+
+    toast.success("Post dodany pomyślnie!");
+    router.push(`/topic/${topicId}`);
+  } catch {
+    toast.error("Operacja nie powiodła się");
   }
 };
 </script>
+
 <template>
   <section class="addTopicSection">
     <div class="addTopicContainer">
-      <h2>Dodaj Post</h2>
-      <div v-if="parentPost" class="quoted-post">
+      <h2>
+        <span v-if="isEditMode">Edytuj post</span>
+        <span v-else-if="isReplyMode">Odpowiedz na post</span>
+        <span v-else>Dodaj post</span>
+      </h2>
+
+      <div v-if="parentPost && isReplyMode" class="quoted-post">
         <div class="quoted-author">Odpowiedź do: @{{ parentPost.author?.username }}</div>
         <div class="quoted-content">{{ parentPost.content }}</div>
       </div>
-      <form @submit.prevent="handleAddPost">
+
+      <form @submit.prevent="handleSubmit">
         <div class="input">
           <label for="content">Content</label>
           <textarea id="content" v-model="form.content" rows="3" required></textarea>
         </div>
+
         <div class="input">
           <label for="code">Code (optional)</label>
           <textarea id="code" v-model="form.code" rows="4"></textarea>
         </div>
+
         <div class="input">
           <label for="tags">Tags</label>
           <div class="tags-container">
@@ -97,7 +142,10 @@ const handleAddPost = async () => {
             </div>
           </div>
         </div>
-        <button type="submit" id="submitButton">Dodaj Post</button>
+
+        <button type="submit" id="submitButton">
+          {{ isEditMode ? "Zapisz zmiany" : "Dodaj post" }}
+        </button>
       </form>
     </div>
   </section>

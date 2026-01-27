@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount, reactive, BaseTransition } from "vue";
+import { onMounted, ref, computed, watch, nextTick, onBeforeUnmount, reactive } from "vue";
 import { useToast } from "vue-toastification";
 import axios from "axios";
 import { useRoute, RouterLink } from "vue-router";
@@ -19,7 +19,6 @@ const { username, userId, isAdmin, loadUsername } = useAuth();
 
 const currentTopic = ref<Topic>({} as Topic);
 const subTopics = ref<Topic[]>([]);
-const posts = ref<Post[]>([]);
 const mainPosts = ref<Post[]>([]);
 const repliesMap = ref<Record<string, Post[]>>({});
 const hoveredPostId = ref<string | null>(null);
@@ -250,7 +249,6 @@ const fetchMainPosts = async (page = 1, limit = 10) => {
     } else {
       repliesMap.value = {};
     }
-    posts.value = [...mainPosts.value, ...Object.values(repliesMap.value).flat()];
   } catch (error) {
     toast.error("Failed to load posts.");
   }
@@ -269,41 +267,68 @@ onMounted(async () => {
   await loadUsername();
   await fetchTopicData();
   fetchBlockedUsers();
+
   subtopicHandlers = useSubtopicSocket(currentTopic.value._id);
   subtopicHandlers.subscribeToSubtopic();
-  subtopicHandlers.onNewSubtopic(async (data: { newSubtopic: Topic }) => {
+
+  subtopicHandlers.onNewSubtopic((data: { newSubtopic: Topic }) => {
     subTopics.value.unshift(data.newSubtopic);
   });
-  subtopicHandlers.onNewPost(async (data: { newPost: Post }) => {
+
+  subtopicHandlers.onNewPost((data: { newPost: Post }) => {
     const post = data.newPost;
+
     if (!post.reference) {
       if (pagination.page === 1) {
         mainPosts.value.unshift(post);
+
         if (mainPosts.value.length > pagination.limit) {
           mainPosts.value.pop();
         }
       }
+
       pagination.total += 1;
       pagination.totalPages = Math.ceil(pagination.total / pagination.limit);
     } else {
-      if (!repliesMap.value[post.reference]) repliesMap.value[post.reference] = [];
+      if (!repliesMap.value[post.reference]) {
+        repliesMap.value[post.reference] = [];
+      }
       repliesMap.value[post.reference]!.push(post);
     }
-    posts.value = [...mainPosts.value, ...Object.values(repliesMap.value).flat()];
+
     highlightCode();
   });
+
   subtopicHandlers.onPostLiked((data: { postId: string; likes: string[] }) => {
-    const post = posts.value.find((p) => p._id === data.postId);
-    if (post) {
-      post.likes = data.likes;
+    const main = mainPosts.value.find((p) => p._id === data.postId);
+    if (main) {
+      main.likes = data.likes;
+      return;
     }
+
+    Object.values(repliesMap.value).forEach((replies) => {
+      const reply = replies.find((r) => r._id === data.postId);
+      if (reply) {
+        reply.likes = data.likes;
+      }
+    });
   });
+
   subtopicHandlers.onPostUnliked((data: { postId: string; likes: string[] }) => {
-    const post = posts.value.find((p) => p._id === data.postId);
-    if (post) {
-      post.likes = data.likes;
+    const main = mainPosts.value.find((p) => p._id === data.postId);
+    if (main) {
+      main.likes = data.likes;
+      return;
     }
+
+    Object.values(repliesMap.value).forEach((replies) => {
+      const reply = replies.find((r) => r._id === data.postId);
+      if (reply) {
+        reply.likes = data.likes;
+      }
+    });
   });
+
   subtopicHandlers.onPostDeleted((data: { postId: string }) => {
     const { postId } = data;
 
@@ -312,10 +337,9 @@ onMounted(async () => {
     Object.keys(repliesMap.value).forEach((key) => {
       repliesMap.value[key] = repliesMap.value[key]!.filter((r) => r._id !== postId);
     });
-
-    posts.value = [...mainPosts.value, ...Object.values(repliesMap.value).flat()];
   });
 });
+
 onBeforeUnmount(() => {
   if (subtopicHandlers) {
     subtopicHandlers.unsubscribeFromSubtopic();
@@ -333,14 +357,6 @@ watch(
       await fetchTopicData();
     }
   },
-);
-
-watch(
-  posts,
-  () => {
-    highlightCode();
-  },
-  { deep: true },
 );
 </script>
 
@@ -442,7 +458,7 @@ watch(
           </RouterLink>
         </div>
 
-        <div v-if="posts.length === 0" class="empty-state">
+        <div v-if="mainPosts.length === 0" class="empty-state">
           <p>Brak postów. Bądź pierwszy!</p>
         </div>
         <ul v-else class="posts-list">
@@ -489,9 +505,16 @@ watch(
                     </button>
                   </div>
                 </span>
-
-                <span class="post-date"
-                  ><button
+                <span class="post-date">
+                  <RouterLink
+                    v-if="post.author._id === userId"
+                    :to="`/topic/${currentTopic._id}/edit-post/${post._id}`"
+                    class="edit-post-btn"
+                    title="Edytuj post"
+                  >
+                    <i class="pi pi-pencil"></i>
+                  </RouterLink>
+                  <button
                     v-if="post.author._id === userId || isAdmin"
                     class="delete-post-btn"
                     @click.prevent="deletePost(post._id)"
@@ -585,10 +608,18 @@ watch(
                   </span>
 
                   <span class="post-date">
+                    <RouterLink
+                      v-if="reply.author._id === userId"
+                      :to="`/topic/${currentTopic._id}/edit-post/${reply._id}`"
+                      class="edit-post-btn"
+                      title="Edytuj post"
+                    >
+                      <i class="pi pi-pencil"></i>
+                    </RouterLink>
                     <button
-                      v-if="post.author._id === userId || isAdmin"
+                      v-if="reply.author._id === userId || isAdmin"
                       class="delete-post-btn"
-                      @click.prevent="deletePost(post._id)"
+                      @click.prevent="deletePost(reply._id)"
                     >
                       <i class="pi pi-trash"></i></button
                     >{{ new Date(reply.createdAt).toLocaleDateString() }}</span
@@ -611,9 +642,9 @@ watch(
                 </div>
                 <div v-else class="post-footer-empty-tags">
                   <div>
-                    <button @click.prevent="handleLikePost(post)" class="like-button">
+                    <button @click.prevent="handleLikePost(reply)" class="like-button">
                       <i :class="isLiked(post) ? 'pi pi-heart-fill' : 'pi pi-heart'"></i>
-                      {{ post.likes.length }}
+                      {{ reply.likes.length }}
                     </button>
                   </div>
                 </div>
@@ -652,6 +683,7 @@ watch(
 <style scoped lang="scss">
 .topic-view {
   max-width: 800px;
+  width: 100%;
   margin: 0 auto;
   padding: $padding-lg;
 }
@@ -1091,6 +1123,19 @@ watch(
 
   &:hover {
     color: lighten(#e74c3c, 10%);
+  }
+}
+.edit-post-btn {
+  background: transparent;
+  border: none;
+  color: #f1c40f;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-right: 8px;
+  text-decoration: none;
+
+  &:hover {
+    color: lighten(#f1c40f, 10%);
   }
 }
 </style>

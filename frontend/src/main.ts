@@ -3,7 +3,7 @@ import App from "./App.vue";
 import router from "./router";
 import "./styles/main.scss";
 import "./api/axios";
-
+import { connectSocket } from "@/composables/socket";
 import Toast from "vue-toastification";
 import "vue-toastification/dist/index.css";
 
@@ -15,3 +15,4 @@ app.use(Toast, {
   closeOnClick: true,
 });
 app.mount("#app");
+connectSocket();

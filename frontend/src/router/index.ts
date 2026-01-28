@@ -1,4 +1,5 @@
 import { connectSocket } from "@/composables/socket";
+import axios from "axios";
 import { createRouter, createWebHistory } from "vue-router";
 
 const routes = [
@@ -80,48 +81,52 @@ router.beforeEach(async (to, _from, next) => {
     return next("/login");
   }
 
-  if (token) {
-    try {
-      const userId = localStorage.getItem("userId");
-      if (userId) {
-        const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.status === 403) {
-          if (to.path !== "/banned") {
-            return next("/banned");
-          } else {
-            return next();
-          }
-        }
-        if (response.ok) {
-          connectSocket();
-          const userData = await response.json();
-          const isApproved = userData.approved;
-          const isAdmin = userData.role === "admin";
-
-          if (to.path === "/login" || to.path === "/register") {
-            if (isApproved || isAdmin) {
-              return next("/home");
-            } else {
-              return next("/not-approved");
-            }
-          }
-          if (to.meta.requiresAuth && !isApproved && !isAdmin && to.path !== "/not-approved") {
-            return next("/not-approved");
-          }
-          if ((isApproved || isAdmin) && to.path === "/not-approved") {
-            return next("/home");
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error checking approval status:", error);
-    }
+  if (!token) {
+    return next();
   }
 
-  next();
+  try {
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      return next("/login");
+    }
+
+    const response = await axios.get(`/api/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const userData = response.data;
+
+    const isApproved = userData.approved;
+    const isAdmin = userData.role === "admin";
+
+    connectSocket();
+
+    if (to.path === "/login" || to.path === "/register") {
+      return next(isApproved || isAdmin ? "/home" : "/not-approved");
+    }
+
+    if (to.meta.requiresAuth && !isApproved && !isAdmin && to.path !== "/not-approved") {
+      return next("/not-approved");
+    }
+
+    if ((isApproved || isAdmin) && to.path === "/not-approved") {
+      return next("/home");
+    }
+
+    return next();
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 403) {
+        return next("/banned");
+      }
+    }
+
+    console.error("Error checking approval status:", error);
+    return next("/login");
+  }
 });
+
 export default router;

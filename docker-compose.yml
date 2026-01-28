@@ -1,41 +1,29 @@
 services:
   mongo:
     image: mongo:6
-    container_name: progtalk-mongo
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: progtalk
+    container_name: mongo
     volumes:
       - mongo-data:/data/db
 
   backend:
     build: ./backend
-    container_name: progtalk-backend
-    restart: unless-stopped
-    ports:
-      - "5000:5000"
+    container_name: backend
     env_file:
       - ./backend/.env
     depends_on:
       - mongo
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    command: npm run dev
 
-  frontend:
+  nginx:
     build: ./frontend
-    container_name: progtalk-frontend
-    restart: unless-stopped
+    container_name: nginx
     ports:
-      - "5173:5173"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-    command: npm run dev -- --host
 
 volumes:
   mongo-data:

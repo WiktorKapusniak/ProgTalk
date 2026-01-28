@@ -32,7 +32,6 @@ const form: PostForm = reactive({
 
 const tags = ref<string[]>([]);
 
-/* ===== INIT ===== */
 onMounted(async () => {
   try {
     const tagsRes = await axios.get("/api/tags");
@@ -41,7 +40,6 @@ onMounted(async () => {
     toast.error("Nie udało się załadować tagów");
   }
 
-  /* ===== EDYCJA ===== */
   if (isEditMode.value && postId) {
     try {
       const res = await axios.get(`/api/posts/${postId}`);
@@ -61,7 +59,6 @@ onMounted(async () => {
     }
   }
 
-  /* ===== ODPOWIEDŹ ===== */
   if (isReplyMode.value && parentPostId) {
     try {
       const res = await axios.get(`/api/posts/${parentPostId}`);
@@ -74,12 +71,10 @@ onMounted(async () => {
   }
 });
 
-/* ===== SUBMIT ===== */
 const handleSubmit = async () => {
   try {
     const topicId = route.params.id as string;
 
-    /* ===== EDYTOWANIE ===== */
     if (isEditMode.value && postId) {
       await axios.patch(`/api/posts/${postId}`, {
         content: form.content,
@@ -92,7 +87,6 @@ const handleSubmit = async () => {
       return;
     }
 
-    /* ===== TWORZENIE / ODPOWIEDŹ ===== */
     await axios.post(`/api/topics/${topicId}/posts`, {
       content: form.content,
       code: form.code,

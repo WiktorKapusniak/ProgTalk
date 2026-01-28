@@ -1,4 +1,4 @@
-function registerSubtopicHandlers(socket, io) {
+function registerSubtopicHandlers(io, socket) {
   socket.on("subscribeToSubtopic", (subtopicId) => {
     socket.join(`subtopic-${subtopicId}`);
     console.log(`User ${socket.user.username} subscribed to subtopic ${subtopicId}`);

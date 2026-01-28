@@ -17,9 +17,15 @@ const io = initializeSocket(server);
 require("./config/passport")(passport);
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://localhost",
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(passport.initialize());
+app.set("trust proxy", 1);
 
 // Socket.io initialization
 app.set("io", io);
@@ -54,6 +60,6 @@ app.get("/", (req, res) => {
 });
 
 // Start server
-server.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
 });

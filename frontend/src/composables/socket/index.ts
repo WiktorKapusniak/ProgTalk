@@ -1,20 +1,27 @@
 import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
+
 export const getSocket = () => socket;
 
-export const connectSocket = () => {
-  if (socket?.connected) return socket;
+export const connectSocket = (): Socket => {
+  if (socket && socket.connected) return socket;
 
   const token = localStorage.getItem("token");
-  socket = io("http://localhost:5000", {
-    auth: { token },
+
+  socket = io("https://localhost", {
+    auth: {
+      token,
+    },
+    withCredentials: true,
+    transports: ["websocket", "polling"],
   });
+
   return socket;
 };
 
 export const disconnectSocket = () => {
-  if (socket?.connected) {
+  if (socket) {
     socket.disconnect();
     socket = null;
   }

@@ -358,6 +358,13 @@ watch(
     }
   },
 );
+watch(
+  [mainPosts, repliesMap],
+  () => {
+    highlightCode();
+  },
+  { deep: true },
+);
 </script>
 
 <template>

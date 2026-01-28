@@ -3,25 +3,28 @@ const { registerTopicHandlers } = require("./handlers/topics");
 const { registerSubtopicHandlers } = require("./handlers/subtopic");
 const { registerAdminHandlers } = require("./handlers/admin");
 const { socketAuthMiddleware } = require("./middleware/auth");
+
 function initializeSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: "https://localhost",
       methods: ["GET", "POST"],
       credentials: true,
     },
+    transports: ["websocket", "polling"],
   });
+
   io.use(socketAuthMiddleware);
 
   io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.user.username} (${socket.id})`);
+    console.log(`User connected: ${socket.user?.username ?? "unknown"} (${socket.id})`);
 
     registerTopicHandlers(io, socket);
-    registerSubtopicHandlers(socket, io);
+    registerSubtopicHandlers(io, socket);
     registerAdminHandlers(io, socket);
 
     socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.user.username}`);
+      console.log(`User disconnected: ${socket.user?.username ?? "unknown"}`);
     });
   });
 

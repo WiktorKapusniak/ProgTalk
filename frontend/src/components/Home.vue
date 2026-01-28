@@ -7,12 +7,13 @@ import axios from "axios";
 import type Topic from "@/interfaces/Topic";
 import Pagination from "./Pagination.vue";
 import type PaginationProps from "@/interfaces/Pagination";
+
 import { useAuth } from "@/composables/useAuth";
 import { useTopicSocket } from "@/composables/socket/topicSocket";
 import { onBeforeUnmount } from "vue";
 
 const toast = useToast();
-const { isAdmin, loadUsername, username } = useAuth();
+const { isAdmin, loadUsername, username, userId } = useAuth();
 const { subscribeToTopics, unsubscribeFromTopics, onNewTopic, offNewTopic } = useTopicSocket();
 const hoveredTopicId = ref<string | null>(null);
 
@@ -171,6 +172,14 @@ onBeforeUnmount(() => {
       <ul v-else class="topic-list">
         <li v-for="topic in topics" :key="topic._id" class="topic-item" @mouseleave="hoveredTopicId = null">
           <RouterLink :to="`/topic/${topic._id}`" class="topic-link">
+            <RouterLink
+              v-if="userId && topic.mainModerator._id === userId"
+              :to="`/edit-topic/${topic._id}`"
+              class="edit-topic-btn"
+              @click.stop
+            >
+              <i class="pi pi-pencil"></i>
+            </RouterLink>
             <div v-if="topic.isClosed">
               <i
                 v-if="isAdmin"
@@ -431,5 +440,18 @@ onBeforeUnmount(() => {
   &:hover {
     color: lighten(#e74c3c, 10%);
   }
+}
+.edit-topic-btn {
+  position: absolute;
+  right: 6rem;
+  top: $padding-sm;
+  align-items: center;
+  color: $text-white;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.edit-topic-btn:hover {
+  color: $primary-lighter;
 }
 </style>

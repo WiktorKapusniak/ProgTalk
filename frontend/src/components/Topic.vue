@@ -403,6 +403,14 @@ watch(
             class="subtopic-item"
             @mouseleave="banHoveredTopicId = null"
           >
+            <RouterLink
+              v-if="userId && subtopic.mainModerator._id === userId"
+              :to="`/edit-topic/${subtopic._id}`"
+              class="edit-topic-btn"
+              @click.stop
+            >
+              <i class="pi pi-pencil"></i>
+            </RouterLink>
             <RouterLink :to="`/topic/${subtopic._id}`" class="subtopic-link">
               <div v-if="subtopic.isClosed">
                 <i
@@ -1144,5 +1152,18 @@ watch(
   &:hover {
     color: lighten(#f1c40f, 10%);
   }
+}
+.edit-topic-btn {
+  position: absolute;
+  right: 6rem;
+  top: $padding-sm;
+  align-items: center;
+  color: $text-white;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.edit-topic-btn:hover {
+  color: $primary-lighter;
 }
 </style>

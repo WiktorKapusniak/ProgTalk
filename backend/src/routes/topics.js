@@ -120,6 +120,9 @@ router.get("/:id", isLoggedIn, async (req, res) => {
 router.patch("/:id", loadTopic, async (req, res) => {
   try {
     const topic = req.topic;
+    if (!req.user || topic.mainModerator.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Only main moderator can edit this topic" });
+    }
     const { title, description } = req.body;
 
     if (title) topic.title = title;
@@ -287,6 +290,19 @@ router.post("/:id/unblock-user", loadTopic, isModerator, async (req, res) => {
       subtopic.blockedUsers = subtopic.blockedUsers.filter((b) => b.user.toString() !== userId);
       await subtopic.save();
     }
+
+    async function allowInParentTopics(currentTopic) {
+      if (!currentTopic.parentTopic) return;
+      const parent = await Topic.findById(currentTopic.parentTopic);
+      if (!parent) return;
+      const block = parent.blockedUsers.find((b) => b.user.toString() === userId);
+      if (block && !block.allowedSubtopics.map((id) => id.toString()).includes(currentTopic._id.toString())) {
+        block.allowedSubtopics.push(currentTopic._id);
+        await parent.save();
+      }
+      await allowInParentTopics(parent);
+    }
+    await allowInParentTopics(topic);
 
     res.json({ message: "User unblocked in topic and all subtopics" });
   } catch (err) {

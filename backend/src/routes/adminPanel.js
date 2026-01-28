@@ -31,6 +31,11 @@ router.post("/users/:id/approve", async (req, res) => {
     }
     user.approved = true;
     await user.save();
+    const { notifyAdmins } = require("../socket/handlers/admin");
+    const io = req.app.get("io");
+    if (io) {
+      notifyAdmins(io, "newApproval", { message: "Użytkownik został approved przez admina" });
+    }
     res.status(200).json({ message: "User approved successfully" });
   } catch (err) {
     console.error("POST /users/:id/approve error:", err);

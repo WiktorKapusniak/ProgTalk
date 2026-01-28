@@ -1,5 +1,38 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue";
 import Navbar from "@/components/Navbar.vue";
+import Notification from "@/components/Notification.vue";
+import { useAdminSocket } from "@/composables/socket/adminSocket";
+
+const notificationMessage = ref("");
+const notificationKey = ref(0);
+
+const { subscribeToAdmin, unsubscribeFromAdmin, onNewRegistration, offNewRegistration, onNewApproval, offNewApproval } =
+  useAdminSocket();
+
+function showNotification(msg: string) {
+  console.log("POWIADOMIENIE:", msg);
+  notificationMessage.value = msg;
+  notificationKey.value++;
+}
+
+onMounted(() => {
+  subscribeToAdmin();
+  console.log("Subscribed to admin socket events");
+  onNewRegistration((data: any) => {
+    console.log("EVENT newRegistration", data);
+    showNotification(data?.message || "Nowy użytkownik czeka na approval");
+  });
+  onNewApproval((data: any) => {
+    console.log("EVENT newApproval", data);
+    showNotification(data?.message || "Użytkownik został zaaprobowany przez admina");
+  });
+});
+onUnmounted(() => {
+  offNewRegistration();
+  offNewApproval();
+  unsubscribeFromAdmin();
+});
 </script>
 
 <template>
@@ -8,6 +41,7 @@ import Navbar from "@/components/Navbar.vue";
     <main class="content">
       <router-view />
     </main>
+    <Notification v-if="notificationMessage" :key="notificationKey" :message="notificationMessage" />
   </div>
 </template>
 

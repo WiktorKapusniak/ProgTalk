@@ -4,10 +4,6 @@ import { createRouter, createWebHistory } from "vue-router";
 
 const routes = [
   {
-    path: "/",
-    redirect: "/login",
-  },
-  {
     path: "/register",
     component: () => import("../views/RegisterView.vue"),
   },
@@ -67,6 +63,7 @@ const routes = [
       },
     ],
   },
+  { path: "/:catchAll(.*)", redirect: "/login" },
 ];
 
 const router = createRouter({

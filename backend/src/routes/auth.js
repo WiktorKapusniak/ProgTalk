@@ -4,6 +4,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const { hashPassword, verifyPassword } = require("../utils/auth");
+const { notifyAdmins } = require("../socket/handlers/admin");
 const jwt = require("jsonwebtoken");
 
 router.post("/login", async (req, res) => {
@@ -49,6 +50,10 @@ router.post("/register", async (req, res) => {
       createdAt: new Date(),
     });
     await newUser.save();
+    const io = req.app.get("io");
+    if (io) {
+      notifyAdmins(io, "newRegistration", { message: "Nowy użytkownik czeka na approval" });
+    }
     return res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
     console.error("Post /register error:", err);

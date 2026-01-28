@@ -3,7 +3,8 @@ import { ref, onMounted, onUnmounted } from "vue";
 import Navbar from "@/components/Navbar.vue";
 import Notification from "@/components/Notification.vue";
 import { useAdminSocket } from "@/composables/socket/adminSocket";
-
+import { useAuth } from "@/composables/useAuth";
+const { isAdmin, loadUsername } = useAuth();
 const notificationMessage = ref("");
 const notificationKey = ref(0);
 
@@ -11,27 +12,30 @@ const { subscribeToAdmin, unsubscribeFromAdmin, onNewRegistration, offNewRegistr
   useAdminSocket();
 
 function showNotification(msg: string) {
-  console.log("POWIADOMIENIE:", msg);
   notificationMessage.value = msg;
   notificationKey.value++;
 }
 
-onMounted(() => {
-  subscribeToAdmin();
-  console.log("Subscribed to admin socket events");
-  onNewRegistration((data: any) => {
-    console.log("EVENT newRegistration", data);
-    showNotification(data?.message || "Nowy użytkownik czeka na approval");
-  });
-  onNewApproval((data: any) => {
-    console.log("EVENT newApproval", data);
-    showNotification(data?.message || "Użytkownik został zaaprobowany przez admina");
-  });
+onMounted(async () => {
+  await loadUsername();
+  if (isAdmin.value) {
+    subscribeToAdmin();
+    console.log("test");
+    onNewRegistration((data: any) => {
+      showNotification(data?.message || "Nowy użytkownik czeka na approval");
+    });
+    onNewApproval((data: any) => {
+      showNotification(data?.message || "Użytkownik został zaaprobowany przez admina");
+    });
+  }
 });
 onUnmounted(() => {
-  offNewRegistration();
-  offNewApproval();
-  unsubscribeFromAdmin();
+  if (isAdmin.value) {
+    console.log("test off");
+    offNewRegistration();
+    offNewApproval();
+    unsubscribeFromAdmin();
+  }
 });
 </script>
 

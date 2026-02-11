@@ -138,11 +138,21 @@ const hideTopic = async (topicId: string) => {
   if (!confirm("Czy na pewno chcesz schować ten temat?")) {
     return;
   }
+
+  const topic = subTopics.value.find((t) => t._id === topicId);
+
   try {
     await axios.post(`/api/topics/${topicId}/hide`);
+
+    if (topic) {
+      topic.isHidden = true;
+    }
+
     toast.success("Temat został schowany");
-    await fetchTopicData();
   } catch (error) {
+    if (topic) {
+      topic.isHidden = false;
+    }
     toast.error("Nie udało się schować tematu");
   }
 };
@@ -150,11 +160,21 @@ const unhideTopic = async (topicId: string) => {
   if (!confirm("Czy na pewno chcesz odkryć ten temat?")) {
     return;
   }
+
+  const topic = subTopics.value.find((t) => t._id === topicId);
+
   try {
     await axios.post(`/api/topics/${topicId}/unhide`);
+
+    if (topic) {
+      topic.isHidden = false;
+    }
+
     toast.success("Temat został odkryty");
-    await fetchTopicData();
   } catch (error) {
+    if (topic) {
+      topic.isHidden = true;
+    }
     toast.error("Nie udało się odkryć tematu");
   }
 };
@@ -162,11 +182,21 @@ const closeTopic = async (topicId: string) => {
   if (!confirm("Czy na pewno chcesz zamknąć ten temat?")) {
     return;
   }
+
+  const topic = subTopics.value.find((t) => t._id === topicId);
+
   try {
     await axios.post(`/api/topics/${topicId}/close`);
+
+    if (topic) {
+      topic.isClosed = true;
+    }
+
     toast.success("Temat został zamknięty");
-    await fetchTopicData();
   } catch (error) {
+    if (topic) {
+      topic.isClosed = false;
+    }
     toast.error("Nie udało się zamknąć tematu");
   }
 };
@@ -174,11 +204,21 @@ const openTopic = async (topicId: string) => {
   if (!confirm("Czy na pewno chcesz otworzyć ten temat?")) {
     return;
   }
+
+  const topic = subTopics.value.find((t) => t._id === topicId);
+
   try {
     await axios.post(`/api/topics/${topicId}/open`);
+
+    if (topic) {
+      topic.isClosed = false;
+    }
+
     toast.success("Temat został otwarty");
-    await fetchTopicData();
   } catch (error) {
+    if (topic) {
+      topic.isClosed = true;
+    }
     toast.error("Nie udało się otworzyć tematu");
   }
 };
@@ -196,8 +236,6 @@ const deletePost = async (postId: string) => {
   try {
     await axios.delete(`/api/posts/${postId}`);
     toast.success("Post został usunięty");
-
-    await fetchMainPosts(pagination.page, pagination.limit);
   } catch (err) {
     toast.error("Nie udało się usunąć posta");
   }
@@ -888,7 +926,7 @@ watch(
 }
 #reply-post {
   margin-top: $margin-md;
-  margin-left: $padding-lg * 2.5;
+  margin-left: $padding-lg * 1.5;
   padding: $padding-md * 1.5;
   border-radius: $border-radius-lg;
   border-left: 3px solid $primary-lighter;

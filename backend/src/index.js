@@ -12,7 +12,7 @@ const { initializeSocket } = require("./socket");
 const app = express();
 const PORT = process.env.PORT || 443;
 
-// HTTPS server with SSL certificates
+// ssl options
 const httpsOptions = {
   key: fs.readFileSync(path.join(__dirname, "../certs/nginx.key")),
   cert: fs.readFileSync(path.join(__dirname, "../certs/nginx.crt")),
@@ -56,10 +56,9 @@ app.use("/api/", isLoggedIn, isApproved, postRoutes);
 app.use("/api/tags", isLoggedIn, isApproved, tagRoutes);
 app.use("/api/admin-panel", isLoggedIn, isAdmin, adminPanelRoutes);
 
-// Serve static files from Vue frontend
+// Serve static files
 app.use(express.static(path.join(__dirname, "../public")));
-
-// SPA fallback - serve index.html for all non-API routes
+//spa fallback
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });

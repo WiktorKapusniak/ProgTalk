@@ -1,22 +1,21 @@
-# Stage 1: Build frontend
+# frontend-build
 FROM node:22 AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
-RUN npm run build
+RUN npm run dir-out
 
-# Stage 2: Backend with built frontend
+# backend-build
 FROM node:18
 WORKDIR /app
 
-# Copy backend files
 COPY backend/package*.json ./
 RUN npm install
 COPY backend/ ./
 
-# Copy built frontend from stage 1
-COPY --from=frontend-build /frontend/dist ./public
+# Copy built frontend files from frontend-build stage
+COPY --from=frontend-build /backend/public ./public
 
 EXPOSE 5000
 

@@ -306,6 +306,14 @@ onMounted(async () => {
   await fetchTopicData();
   fetchBlockedUsers();
 
+  await nextTick();
+  if (route.hash) {
+    const element = document.querySelector(route.hash);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
   subtopicHandlers = useSubtopicSocket(currentTopic.value._id);
   subtopicHandlers.subscribeToSubtopic();
 
@@ -517,6 +525,7 @@ watch(
         <ul v-else class="posts-list">
           <li v-for="post in mainPosts" :key="post._id">
             <div
+              :id="`post-${post._id}`"
               class="post-item"
               @mouseleave="
                 hoveredPostId = null;
@@ -617,8 +626,8 @@ watch(
               <li
                 v-for="reply in repliesMap[post._id]"
                 :key="reply._id"
+                :id="`post-${reply._id}`"
                 class="post-item"
-                id="reply-post"
                 @mouseleave="
                   hoveredPostId = null;
                   banHoveredPostId = null;
@@ -924,13 +933,18 @@ watch(
   flex-direction: column;
   gap: $margin-lg;
 }
-#reply-post {
+
+.posts-list .posts-list li {
   margin-top: $margin-md;
   margin-left: $padding-lg * 1.5;
-  padding: $padding-md * 1.5;
-  border-radius: $border-radius-lg;
-  border-left: 3px solid $primary-lighter;
+
+  .post-item {
+    padding: $padding-md * 1.5;
+    border-radius: $border-radius-lg;
+    border-left: 3px solid $primary-lighter;
+  }
 }
+
 .post-item {
   background: $background-lighter;
   padding: $padding-md * 1.5;

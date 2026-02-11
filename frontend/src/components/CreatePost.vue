@@ -83,7 +83,7 @@ const handleSubmit = async () => {
       });
 
       toast.success("Post został zaktualizowany");
-      router.push(`/topic/${topicId}`);
+      router.push(`/topic/${topicId}#post-${postId}`);
       return;
     }
 

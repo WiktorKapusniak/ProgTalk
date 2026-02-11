@@ -1,9 +1,9 @@
-const User = require("../models/User");
 const express = require("express");
 const router = express.Router();
 const Topic = require("../models/Topic");
 const Post = require("../models/Post");
 const { isAdmin, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
+const { validatePostCreation } = require("../middleware/validation");
 
 // GET /api/topics/:topicId/posts?page=1&limit=20
 router.get("/topics/:topicId/posts", loadTopic, async (req, res) => {
@@ -84,7 +84,7 @@ router.get("/posts/:postId", async (req, res) => {
 });
 
 // POST /api/topics/:topicId/posts
-router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, async (req, res) => {
+router.post("/topics/:topicId/posts", loadTopic, checkIfBlockedInTopic, validatePostCreation, async (req, res) => {
   try {
     const parentTopic = req.topic;
     const { content, code, tags, reference } = req.body;
@@ -144,38 +144,6 @@ router.patch("/posts/:postId", async (req, res) => {
     res.json({ message: "Post updated successfully", post: populatedPost });
   } catch (err) {
     console.error("PATCH /posts/:postId error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// POST /api/topics/:topicId/posts/referencePost
-router.post("/topics/:topicId/posts/referencePost", loadTopic, checkIfBlockedInTopic, async (req, res) => {
-  try {
-    const parentTopic = req.topic;
-    const { content, code, tags, reference } = req.body;
-    const author = req.user._id;
-
-    if (parentTopic.isClosed) {
-      return res.status(403).json({ message: "Cannot add post to closed topic" });
-    }
-
-    const newPost = new Post({
-      content,
-      code,
-      tags,
-      author,
-      reference,
-      topic: parentTopic._id,
-    });
-    await newPost.save();
-    const io = req.app.get("io");
-    const populatedPost = await Post.findById(newPost._id).populate("author", "username");
-    io.to(`subtopic-${parentTopic._id}`).emit("newPost", {
-      newPost: populatedPost,
-    });
-    res.status(201).json({ message: "Post created successfully", post: populatedPost });
-  } catch (err) {
-    console.error("POST /:topicId/posts/referencePost error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

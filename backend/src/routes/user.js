@@ -2,8 +2,9 @@ const User = require("../models/User");
 const express = require("express");
 const router = express.Router();
 const { hashPassword } = require("../utils/auth");
-const { isLoggedIn } = require("../middleware/auth");
-router.get("/:id", isLoggedIn, async (req, res) => {
+
+// GET /api/users/:id
+router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
@@ -32,6 +33,7 @@ router.get("/:id", isLoggedIn, async (req, res) => {
   }
 });
 
+// PATCH /api/users/:id
 router.patch("/:id", async (req, res) => {
   try {
     const { id } = req.params;

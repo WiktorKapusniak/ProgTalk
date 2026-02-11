@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const { isLoggedIn, isAdmin } = require("../middleware/auth");
 
+// GET /api/admin/users/banned
 router.get("/users/banned", async (req, res) => {
   try {
     const bannedUsers = await User.find({ banned: true }).select("-password");
@@ -12,6 +13,8 @@ router.get("/users/banned", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// POST /api/admin/ban/:username
 router.get("/users/pending-approval", async (req, res) => {
   try {
     const pendingUsers = await User.find({ approved: false }).select("-password");
@@ -22,6 +25,7 @@ router.get("/users/pending-approval", async (req, res) => {
   }
 });
 
+// POST /api/admin/users/:id/approve
 router.post("/users/:id/approve", async (req, res) => {
   const userId = req.params.id;
   try {
@@ -32,10 +36,10 @@ router.post("/users/:id/approve", async (req, res) => {
     user.approved = true;
     await user.save();
     const { notifyAdmins } = require("../socket/handlers/admin");
+
     const io = req.app.get("io");
-    if (io) {
-      notifyAdmins(io, "newApproval", { message: "Użytkownik został approved przez admina" });
-    }
+    notifyAdmins(io, "newApproval", { message: "Użytkownik został approved przez admina" });
+
     res.status(200).json({ message: "User approved successfully" });
   } catch (err) {
     console.error("POST /users/:id/approve error:", err);

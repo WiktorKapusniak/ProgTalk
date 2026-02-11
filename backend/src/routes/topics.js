@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const Topic = require("../models/Topic");
 const { isAdmin, isLoggedIn, isModerator, loadTopic, checkIfBlockedInTopic } = require("../middleware/auth");
+const { validateTopicCreation } = require("../middleware/validation");
 
 async function getAllSubtopicIds(topicId) {
   const subtopics = await Topic.find({ parentTopic: topicId }, "_id");
@@ -13,12 +14,12 @@ async function getAllSubtopicIds(topicId) {
   }
   return ids;
 }
+
 // POST /api/topics
-router.post("/", async (req, res) => {
+router.post("/", validateTopicCreation, async (req, res) => {
   const { title, description } = req.body;
   try {
     const io = req.app.get("io");
-    const mainMod = await User.findById(req.user._id);
     const newTopic = new Topic({
       title,
       description,
@@ -78,7 +79,6 @@ router.get("/", isLoggedIn, async (req, res) => {
 router.get("/:id/subtopics", isLoggedIn, async (req, res) => {
   try {
     const { id } = req.params;
-    // Pobierz użytkownika z tokena jeśli jest
     const user = req.user;
     let query = { parentTopic: id };
     if (!user || user.role !== "admin") {
@@ -96,7 +96,6 @@ router.get("/:id/subtopics", isLoggedIn, async (req, res) => {
 });
 
 // GET /api/topics/:id
-
 router.get("/:id", isLoggedIn, async (req, res) => {
   try {
     const { id } = req.params;
@@ -137,7 +136,7 @@ router.patch("/:id", loadTopic, async (req, res) => {
 });
 
 // POST /api/topics/:id/subtopics
-router.post("/:id/subtopics", loadTopic, async (req, res) => {
+router.post("/:id/subtopics", loadTopic, validateTopicCreation, async (req, res) => {
   try {
     const io = req.app.get("io");
     const parentTopic = req.topic;

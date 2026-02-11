@@ -6,6 +6,7 @@ function registerAdminHandlers(io, socket) {
   socket.on("disconnect", () => {
     if (socket.user.role === "admin") {
       console.log(`Socket ${socket.id} left admins room`);
+      socket.leave("admins");
     }
   });
 }

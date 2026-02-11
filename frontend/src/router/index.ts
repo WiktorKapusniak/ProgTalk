@@ -1,6 +1,9 @@
 import { connectSocket } from "@/composables/socket";
 import axios from "axios";
 import { createRouter, createWebHistory } from "vue-router";
+import { useAuth } from "@/composables/useAuth";
+
+const { loadUsername, approved, isAdmin } = useAuth();
 
 const routes = [
   {
@@ -92,28 +95,23 @@ router.beforeEach(async (to, _from, next) => {
       return next("/login");
     }
 
-    const response = await axios.get(`/api/users/${userId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const userData = response.data;
-
-    const isApproved = userData.approved;
-    const isAdmin = userData.role === "admin";
-
-    connectSocket();
-
-    if (to.path === "/login" || to.path === "/register") {
-      return next(isApproved || isAdmin ? "/home" : "/not-approved");
+    if (approved.value === null) {
+      await loadUsername();
+      connectSocket();
     }
 
-    if (to.meta.requiresAuth && !isApproved && !isAdmin && to.path !== "/not-approved") {
+    const isApprovedUser = approved.value;
+    const isAdminUser = isAdmin.value;
+
+    if (to.path === "/login" || to.path === "/register") {
+      return next(isApprovedUser || isAdminUser ? "/home" : "/not-approved");
+    }
+
+    if (to.meta.requiresAuth && !isApprovedUser && !isAdminUser && to.path !== "/not-approved") {
       return next("/not-approved");
     }
 
-    if ((isApproved || isAdmin) && to.path === "/not-approved") {
+    if ((isApprovedUser || isAdminUser) && to.path === "/not-approved") {
       return next("/home");
     }
 

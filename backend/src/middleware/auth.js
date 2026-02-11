@@ -18,12 +18,13 @@ function isLoggedIn(req, res, next) {
 }
 
 function isAdmin(req, res, next) {
-  isLoggedIn(req, res, () => {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Admins only" });
-    }
-    next();
-  });
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden: Admins only" });
+  }
+  next();
 }
 
 function isApproved(req, res, next) {
@@ -33,6 +34,21 @@ function isApproved(req, res, next) {
   if (!req.user.approved) {
     return res.status(403).json({ message: "Forbidden: Account not approved yet. Please wait for admin approval." });
   }
+  next();
+}
+
+function isModerator(req, res, next) {
+  const topic = req.topic;
+
+  const isTopicModerator =
+    topic.mainModerator.toString() === req.user._id.toString() ||
+    topic.moderators.some((mod) => mod.toString() === req.user._id.toString()) ||
+    req.user.role === "admin";
+
+  if (!isTopicModerator) {
+    return res.status(403).json({ message: "You are not a moderator of this topic" });
+  }
+
   next();
 }
 
@@ -57,21 +73,6 @@ async function loadTopic(req, res, next) {
     res.status(500).json({ message: "Server error" });
   }
 }
-function isModerator(req, res, next) {
-  const topic = req.topic;
-
-  const isTopicModerator =
-    topic.mainModerator.toString() === req.user._id.toString() ||
-    topic.moderators.some((mod) => mod.toString() === req.user._id.toString()) ||
-    req.user.role === "admin";
-
-  if (!isTopicModerator) {
-    return res.status(403).json({ message: "You are not a moderator of this topic" });
-  }
-
-  next();
-}
-
 async function checkIfBlockedInTopic(req, res, next) {
   try {
     const topicId = req.params.topicId || req.topic._id;

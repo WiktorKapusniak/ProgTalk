@@ -5,9 +5,11 @@ const router = express.Router();
 const User = require("../models/User");
 const { hashPassword, verifyPassword } = require("../utils/auth");
 const { notifyAdmins } = require("../socket/handlers/admin");
+const { validateLogin, validateRegister } = require("../middleware/validation");
 const jwt = require("jsonwebtoken");
 
-router.post("/login", async (req, res) => {
+// POST /api/auth/login
+router.post("/login", validateLogin, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -33,7 +35,8 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/register", async (req, res) => {
+// POST /api/auth/register
+router.post("/register", validateRegister, async (req, res) => {
   try {
     const { username, email, password } = req.body;
     if (!username || !email || !password) {

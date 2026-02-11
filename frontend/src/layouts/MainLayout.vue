@@ -25,7 +25,7 @@ onMounted(async () => {
       showNotification(data?.message || "Nowy użytkownik czeka na approval");
     });
     onNewApproval((data: any) => {
-      showNotification(data?.message || "Użytkownik został zaaprobowany przez admina");
+      showNotification(data?.message || "Użytkownik został zaakceptowany przez admina");
     });
   }
 });

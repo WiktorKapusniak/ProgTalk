@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const { isLoggedIn, isAdmin } = require("../middleware/auth");
 
+// GET /api/admin/users/banned
 router.post("/ban/:username", async (req, res) => {
   try {
     const { username } = req.params;
@@ -25,6 +26,7 @@ router.post("/ban/:username", async (req, res) => {
   }
 });
 
+// POST /api/admin/unban/:username
 router.post("/unban/:username", async (req, res) => {
   try {
     const { username } = req.params;

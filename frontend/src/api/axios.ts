@@ -10,6 +10,7 @@ axios.interceptors.request.use((config) => {
   }
   return config;
 });
+
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -23,5 +24,5 @@ axios.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );

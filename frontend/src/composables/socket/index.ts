@@ -9,7 +9,11 @@ export const connectSocket = (): Socket => {
 
   const token = localStorage.getItem("token");
 
-  socket = io("https://localhost", {
+  // dev http://localhost:5173
+  // prod https://localhost
+  const socketUrl = import.meta.env.DEV ? "http://localhost:5173" : window.location.origin;
+
+  socket = io(socketUrl, {
     auth: {
       token,
     },

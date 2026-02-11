@@ -17,14 +17,14 @@ function initializeSocket(server) {
   io.use(socketAuthMiddleware);
 
   io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.user?.username ?? "unknown"} (${socket.id})`);
+    console.log(`User connected: ${socket.user?.username} (${socket.id})`);
 
     registerTopicHandlers(io, socket);
     registerSubtopicHandlers(io, socket);
     registerAdminHandlers(io, socket);
 
     socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.user?.username ?? "unknown"}`);
+      console.log(`User disconnected: ${socket.user?.username}`);
     });
   });
 

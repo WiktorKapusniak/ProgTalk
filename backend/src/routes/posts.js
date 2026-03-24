@@ -57,7 +57,7 @@ router.get("/posts/replies", async (req, res) => {
       query.deleted = false;
     }
 
-    const replies = await Post.find(query).populate("author", "username").sort({ createdAt: 1 });
+    const replies = await Post.find(query).populate("author", "username").sort({ createdAt: 1 })
     res.json({ replies });
   } catch (err) {
     console.error("GET /posts/replies error:", err);
